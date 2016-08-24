@@ -17,7 +17,7 @@ Buffer::~Buffer(){
 }
 
 void Buffer::nice(){
-	// ä¿è¯ä¸æ”¹å˜åŽåŠæ®µçš„æ•°æ®, ä»¥ä¾¿ä½¿å·²ç”Ÿæˆçš„ Bytes ä¸å¤±æ•ˆ.
+	// ±£Ö¤²»¸Ä±äºó°ë¶ÎµÄÊý¾Ý, ÒÔ±ãÊ¹ÒÑÉú³ÉµÄ Bytes ²»Ê§Ð§.
 	if(data_ - buf > total_/2){
 		if(size_ > 0){
 			memcpy(buf, data_, size_);
@@ -26,7 +26,7 @@ void Buffer::nice(){
 	}
 }
 
-int Buffer::grow(){ // æ‰©å¤§ç¼“å†²åŒº
+int Buffer::grow(){ // À©´ó»º³åÇø
 	int n;
 	if(total_ < 8 * 1024){
 		n = 8 * 1024;

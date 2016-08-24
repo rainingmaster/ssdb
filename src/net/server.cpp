@@ -115,7 +115,7 @@ NetworkServer* NetworkServer::init(const char *conf_file, int num_readers, int n
 			exit(1);
 		}
 	}
-	NetworkServer* serv = init(*conf, num_readers, num_writers);
+	NetworkServer* serv = init(*conf, num_readers, num_writers); //调用下面的重载函数
 	delete conf;
 	return serv;
 }
@@ -127,7 +127,7 @@ NetworkServer* NetworkServer::init(const Config &conf, int num_readers, int num_
 	}
 	inited = true;
 	
-	NetworkServer *serv = new NetworkServer();
+	NetworkServer *serv = new NetworkServer(); //调用构造函数
 	if(num_readers >= 0){
 		serv->num_readers = num_readers;
 	}
@@ -193,15 +193,16 @@ NetworkServer* NetworkServer::init(const Config &conf, int num_readers, int num_
 
 void NetworkServer::serve(){
 	writer = new ProcWorkerPool("writer");
-	writer->start(num_writers);
+	writer->start(num_writers); //启动多个写线程
 	reader = new ProcWorkerPool("reader");
-	reader->start(num_readers);
+	reader->start(num_readers); //启动多个读线程
 
 	ready_list_t ready_list;
 	ready_list_t ready_list_2;
 	ready_list_t::iterator it;
 	const Fdevents::events_t *events;
 
+	// 设置三个需要监听的文件描述符，serv_link监听新连接到来，reader读任务线程池，write写任务线程池
 	fdes->set(serv_link->fd(), FDEVENT_IN, 0, serv_link);
 	fdes->set(this->reader->fd(), FDEVENT_IN, 0, this->reader);
 	fdes->set(this->writer->fd(), FDEVENT_IN, 0, this->writer);
@@ -256,9 +257,10 @@ void NetworkServer::serve(){
 			}
 		}
 
+		// 针对已经 ready 的队列进行处理
 		for(it = ready_list.begin(); it != ready_list.end(); it ++){
 			Link *link = *it;
-			if(link->error()){
+			if(link->error()){ // 链接有问题(或者对方主动 close 了)，断开链接
 				this->link_count --;
 				fdes->del(link->fd());
 				delete link;
@@ -466,7 +468,7 @@ int NetworkServer::proc(ProcJob *job){
 		job->time_wait = 1000 * (millitime() - job->stime);
 		job->result = (*p)(this, job->link, *req, &job->resp);
 		job->time_proc = 1000 * (millitime() - job->stime) - job->time_wait;
-	}while(0);
+	}while(0); // do once
 	
 	if(job->link->send(job->resp.resp) == -1){
 		job->result = PROC_ERROR;

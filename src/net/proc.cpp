@@ -36,7 +36,7 @@ void ProcMap::set_proc(const std::string &c, const char *sflags, proc_t proc){
 			case 'r':
 				cmd->flags |= Command::FLAG_READ;
 				break;
-			case 'w': // w å¿…é¡»å’Œ t åŒæ—¶å‡ºç°, å› ä¸ºæŸäº›å†™æ“ä½œä¾èµ–å•çº¿ç¨‹
+			case 'w': // w ±ØĞëºÍ t Í¬Ê±³öÏÖ, ÒòÎªÄ³Ğ©Ğ´²Ù×÷ÒÀÀµµ¥Ïß³Ì
 				cmd->flags |= Command::FLAG_WRITE;
 				cmd->flags |= Command::FLAG_THREAD;
 				break;
@@ -50,6 +50,9 @@ void ProcMap::set_proc(const std::string &c, const char *sflags, proc_t proc){
 	}
 }
 
+/*
+ * ¸ù¾İ×Ö·û´®²éÕÒ¶ÔÓ¦µÄ´¦ÀíÃüÁî
+ */
 Command* ProcMap::get_proc(const Bytes &str){
 	proc_map_t::iterator it = proc_map.find(str);
 	if(it != proc_map.end()){

@@ -43,6 +43,7 @@ int Fdevents::set(int fd, int flags, int data_num, void *data_ptr){
 	if(fde->s_flags & FDEVENT_IN)  epe.events |= EPOLLIN;
 	if(fde->s_flags & FDEVENT_OUT) epe.events |= EPOLLOUT;
 
+	// 添加 epoll 监听
 	int ret = epoll_ctl(ep_fd, ctl_op, fd, &epe);
 	if(ret == -1){
 		return -1;
@@ -89,6 +90,7 @@ const Fdevents::events_t* Fdevents::wait(int timeout_ms){
 	struct epoll_event *epe;
 	ready_events.clear();
 
+	// 获取监听的事件 epoll 响应
 	int nfds = epoll_wait(ep_fd, ep_events, MAX_FDS, timeout_ms);
 	if(nfds == -1){
 		if(errno == EINTR){
@@ -97,6 +99,7 @@ const Fdevents::events_t* Fdevents::wait(int timeout_ms){
 		return NULL;
 	}
 
+	// 将监听到的动作添加进队列
 	for(int i = 0; i < nfds; i++){
 		epe = &ep_events[i];
 		fde = (struct Fdevent *)epe->data.ptr;

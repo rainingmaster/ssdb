@@ -13,7 +13,7 @@ found in the LICENSE file.
 #define APP_NAME "ssdb-server"
 #define APP_VERSION SSDB_VERSION
 
-class MyApplication : public Application
+class MyApplication : public Application //继承自application
 {
 public:
 	virtual void usage(int argc, char **argv);
@@ -63,6 +63,8 @@ void MyApplication::run(){
 
 	SSDB *data_db = NULL;
 	SSDB *meta_db = NULL;
+
+	//建立data_db
 	data_db = SSDB::open(option, data_db_dir);
 	if(!data_db){
 		log_fatal("could not open data db: %s", data_db_dir.c_str());
@@ -70,6 +72,7 @@ void MyApplication::run(){
 		exit(1);
 	}
 
+	//建立meta_db
 	meta_db = SSDB::open(Options(), meta_db_dir);
 	if(!meta_db){
 		log_fatal("could not open meta db: %s", meta_db_dir.c_str());
@@ -94,7 +97,9 @@ void MyApplication::run(){
 	log_info("%s exit.", APP_NAME);
 }
 
+/* 程序入口 */
 int main(int argc, char **argv){
 	MyApplication app;
+	//执行app.main
 	return app.main(argc, argv);
 }

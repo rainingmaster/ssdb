@@ -219,7 +219,7 @@ int Link::read(){
 	while((want = input->space()) > 0){
 		// test
 		//want = 1;
-		int len = ::read(sock, input->slot(), want);
+		int len = ::read(sock, input->slot(), want); // ´ÓÁ¬½Ó¶ÁÈëÊý¾Ý
 		if(len == -1){
 			if(errno == EINTR){
 				continue;
@@ -251,7 +251,9 @@ int Link::write(){
 	int want;
 	while((want = output->size()) > 0){
 		// test
-		//want = 1;
+		// want = 1;
+		// output->data Ð´ÈëÐèÒª·µ»ØµÄÊý¾Ý
+		// want ´«ÊäµÄ×Ö¶ÎÊý
 		int len = ::write(sock, output->data(), want);
 		if(len == -1){
 			if(errno == EINTR){
@@ -298,7 +300,7 @@ const std::vector<Bytes>* Link::recv(){
 		return &this->recv_data;
 	}
 
-	// TODO: è®°ä½ä¸Šå›žçš„è§£æžçŠ¶æ€
+	// TODO: ¼Ç×¡ÉÏ»ØµÄ½âÎö×´Ì¬
 	int parsed = 0;
 	int size = input->size();
 	char *head = input->data();

@@ -10,6 +10,7 @@ found in the LICENSE file.
 #include "net/proc.h"
 #include "net/server.h"
 
+/* 定义命令的宏 */
 DEF_PROC(get);
 DEF_PROC(set);
 DEF_PROC(setx);
@@ -131,8 +132,9 @@ DEF_PROC(cluster_set_kv_status);
 DEF_PROC(cluster_migrate_kv_data);
 
 
-#define REG_PROC(c, f)     net->proc_map.set_proc(#c, f, proc_##c)
+#define REG_PROC(c, f)     net->proc_map.set_proc(#c, f, proc_##c) //#define语句中的#是把参数字符串化，##是连接两个参数成为一个整体。
 
+/* 注册命令的宏 */
 void SSDBServer::reg_procs(NetworkServer *net){
 	REG_PROC(get, "rt");
 	REG_PROC(set, "wt");

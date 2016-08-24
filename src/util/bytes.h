@@ -127,7 +127,7 @@ class Buffer{
 		Buffer(int total);
 		~Buffer();
 
-		int total() const{ // ç¼“å†²åŒºå¤§å°
+		int total() const{ // »º³åÇø´óĞ¡
 			return total_;
 		}
 
@@ -135,7 +135,7 @@ class Buffer{
 			return size_ == 0;
 		}
 
-		// æ•°æ®
+		// Êı¾İ
 		char* data() const{
 			return data_;
 		}
@@ -157,13 +157,13 @@ class Buffer{
 		}
 
 		void decr(int num){
-			size_ -= num;
+			size_ -= num; //É¾³ıÒÑ·¢ËÍµÄ×ÖÊı
 			data_ += num;
 		}
 
-		// ä¿è¯ä¸æ”¹å˜ååŠæ®µçš„æ•°æ®, ä»¥ä¾¿ä½¿å·²ç”Ÿæˆçš„ Bytes ä¸å¤±æ•ˆ.
+		// ±£Ö¤²»¸Ä±äºó°ë¶ÎµÄÊı¾İ, ÒÔ±ãÊ¹ÒÑÉú³ÉµÄ Bytes ²»Ê§Ğ§.
 		void nice();
-		// æ‰©å¤§ç¼“å†²åŒº
+		// À©´ó»º³åÇø
 		int grow();
 
 		std::string stats() const;

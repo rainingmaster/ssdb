@@ -39,7 +39,7 @@ struct Fdevent{
 
 class Fdevents{
 	public:
-		typedef std::vector<struct Fdevent *> events_t;
+		typedef std::vector<struct Fdevent *> events_t; //事件向量组，使用 Fdevent 向量组
 	private:
 #ifdef HAVE_EPOLL
 		static const int MAX_FDS = 8 * 1024;

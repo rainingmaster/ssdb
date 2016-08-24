@@ -35,11 +35,26 @@ SSDBImpl::~SSDBImpl(){
 	}
 }
 
+/*
+ * SSDB::open函数根据配置参数和路径打开数据库文件
+ * 由于SSDB是基于leveldb的，所以实际上是调用leveldb的接口创建和打开数据库。
+ */
 SSDB* SSDB::open(const Options &opt, const std::string &dir){
 	SSDBImpl *ssdb = new SSDBImpl();
+	
+	// 如果数据库不存在则创建
 	ssdb->options.create_if_missing = true;
+	
+	// 打开的.sst文件fd的最大数目
 	ssdb->options.max_open_files = opt.max_open_files;
+
+	// LevelDB增加了bloomfilter支持, 可以过滤掉一些key不存在的情况, 减少对磁盘的访问
+	// 建立布隆过滤表
 	ssdb->options.filter_policy = leveldb::NewBloomFilterPolicy(10);
+
+	// block cache 缓存的block数据，block是sstable文件内组织数据的单位，也是从磁盘中读取和写入的单位
+    // block默认大小为4KB，可以使用options.block_size设置，最小1KB，最大4MB。对于频繁做scan操作的应用，
+    // 可适当调大此参数，对大量小value随机读取的应用，也可尝试调小该参数
 	ssdb->options.block_cache = leveldb::NewLRUCache(opt.cache_size * 1048576);
 	ssdb->options.block_size = opt.block_size * 1024;
 	ssdb->options.write_buffer_size = opt.write_buffer_size * 1024 * 1024;
@@ -52,11 +67,14 @@ SSDB* SSDB::open(const Options &opt, const std::string &dir){
 
 	leveldb::Status status;
 
+	// 打开leveldb数据库
 	status = leveldb::DB::Open(ssdb->options, dir, &ssdb->ldb);
 	if(!status.ok()){
 		log_error("open db failed: %s", status.ToString().c_str());
 		goto err;
 	}
+
+	// 创建操作日志队列，用于主从同步时将这些操作在从服务器上执行一遍，从而备份数据到从服务器上
 	ssdb->binlogs = new BinlogQueue(ssdb->ldb, opt.binlog, opt.binlog_capacity);
 
 	return ssdb;

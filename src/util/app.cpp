@@ -9,12 +9,17 @@
 int Application::main(int argc, char **argv){
 	conf = NULL;
 
+	//欢迎
 	welcome();
 	parse_args(argc, argv);
+	//初始化
 	init();
 
+	//写入 pid 文件
 	write_pid();
+	//执行主要逻辑，里面包含循环，直到程序退出
 	run();
+	//删除pid文件
 	remove_pidfile();
 	
 	delete conf;
@@ -88,14 +93,17 @@ void Application::init(){
 		kill_process();
 		exit(0);
 	}
+	// 如果参数为restart，则杀死服务进程，自己继续执行
 	if(app_args.start_opt == "restart"){
 		if(file_exists(app_args.pidfile)){
 			kill_process();
 		}
 	}
-	
+
+	// 检查pid文件是否存在，判断服务进程是否被杀死
 	check_pidfile();
-	
+
+	// 根据日志配置打开日志功能
 	{ // logger
 		std::string log_output;
 		std::string log_level_;
@@ -187,22 +195,29 @@ void Application::remove_pidfile(){
 }
 
 void Application::kill_process(){
+	// 从pid_file中读取正在运行的APP的pid
 	int pid = read_pid();
 	if(pid == -1){
 		fprintf(stderr, "could not read pidfile: %s(%s)\n", app_args.pidfile.c_str(), strerror(errno));
 		exit(1);
 	}
+
+	// 检查进程是否存在
 	if(kill(pid, 0) == -1 && errno == ESRCH){
 		fprintf(stderr, "process: %d not running\n", pid);
 		remove_pidfile();
 		return;
 	}
+	
+	// server在收到SIGTERM信号会结束事件循环，见\src\net\server.cpp 中signal_handler函数
+    // 结束事件循环导致Application::main函数中调用的run函数退出，然后remove_pidfile删除文件
 	int ret = kill(pid, SIGTERM);
 	if(ret == -1){
 		fprintf(stderr, "could not kill process: %d(%s)\n", pid, strerror(errno));
 		exit(1);
 	}
-	
+
+	// 如果pidfile还存在，说明被杀死的服务进程还没有退出，继续等待。
 	while(file_exists(app_args.pidfile)){
 		usleep(100 * 1000);
 	}

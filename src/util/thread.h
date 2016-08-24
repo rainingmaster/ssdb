@@ -69,6 +69,7 @@ class Semaphore {
 };
 */
 
+// ´óÁ¿Ê¹ÓÃÀàÄ£°å
 
 // Thread safe queue
 template <class T>
@@ -211,7 +212,7 @@ int Queue<T>::pop(T *data){
 		return -1;
 	}
 	{
-		// å¿…é¡»æ”¾åœ¨å¾ªç¯ä¸­, å› ä¸º pthread_cond_wait å¯èƒ½æŠ¢ä¸åˆ°é”è€Œè¢«å…¶å®ƒå¤„ç†äº†
+		// ±ØĞë·ÅÔÚÑ­»·ÖĞ, ÒòÎª pthread_cond_wait ¿ÉÄÜÇÀ²»µ½Ëø¶ø±»ÆäËü´¦ÀíÁË
 		while(items.empty()){
 			//fprintf(stderr, "%d wait\n", pthread_self());
 			if(pthread_cond_wait(&cond, &mutex) != 0){
@@ -324,6 +325,9 @@ WorkerPool<W, JOB>::~WorkerPool(){
 	}
 }
 
+/*
+ * push µ½ jobs ¶ÓÁĞÖĞ£¬¹©¶àÏß³ÌÏû·Ñ
+ */
 template<class W, class JOB>
 int WorkerPool<W, JOB>::push(JOB job){
 	return this->jobs.push(job);
@@ -334,6 +338,9 @@ int WorkerPool<W, JOB>::pop(JOB *job){
 	return this->results.pop(job);
 }
 
+/*
+ * Ê¹ÓÃ¶àÏß³ÌÅÜµÄº¯Êı
+ */
 template<class W, class JOB>
 void* WorkerPool<W, JOB>::_run_worker(void *arg){
 	struct run_arg *p = (struct run_arg*)arg;
@@ -345,7 +352,7 @@ void* WorkerPool<W, JOB>::_run_worker(void *arg){
 	Worker *worker = (Worker *)&w;
 	worker->id = id;
 	worker->init();
-	while(1){
+	while(1){ //ËÀÑ­»·£¬²ÎÊıÎªÖ´ĞĞÏß³ÌÖĞµÄ jobs
 		JOB job;
 		if(tp->jobs.pop(&job) == -1){
 			fprintf(stderr, "jobs.pop error\n");
@@ -371,16 +378,17 @@ int WorkerPool<W, JOB>::start(int num_workers){
 	}
 	int err;
 	pthread_t tid;
-	for(int i=0; i<num_workers; i++){
+	for(int i=0; i<num_workers; i++){ //Æô¶¯ num_workers ¸öÏß³Ì
 		struct run_arg *arg = new run_arg();
 		arg->id = i;
 		arg->tp = this;
 
+        /* Ê¹ÓÃÏß³ÌÖ´ĞĞ _run_worker£¬²ÎÊıÎªÉÏÃæ¸´ÖÆµÄ arg */
 		err = pthread_create(&tid, NULL, &WorkerPool::_run_worker, arg);
 		if(err != 0){
 			fprintf(stderr, "can't create thread: %s\n", strerror(err));
 		}else{
-			tids.push_back(tid);
+			tids.push_back(tid); //´´½¨³É¹¦£¬´æÈë tids ÏòÁ¿×é
 		}
 	}
 	started = true;
