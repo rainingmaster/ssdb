@@ -25,7 +25,7 @@ static DEF_PROC(del_deny_ip);
 #define TICK_INTERVAL          100 // ms
 #define STATUS_REPORT_TICKS    (300 * 1000/TICK_INTERVAL) // second
 static const int READER_THREADS = 10;
-static const int WRITER_THREADS = 1;  // å¿…é¡»ä¸º1, å› ä¸ºæŸäº›å†™æ“ä½œä¾èµ–å•çº¿ç¨‹
+static const int WRITER_THREADS = 1;  // å¿…é¡»ä¸?, å› ä¸ºæŸäº›å†™æ“ä½œä¾èµ–å•çº¿ç¨‹
 
 volatile bool quit = false;
 volatile uint32_t g_ticks = 0;
@@ -55,7 +55,7 @@ NetworkServer::NetworkServer(){
 	serv_link = NULL;
 	link_count = 0;
 
-	fdes = new Fdevents();
+	fdes = new Fdevents(); // ÔÚ epoll ÏÂ½¨Á¢ epoll_create
 	ip_filter = new IpFilter();
 
 	// add built-in procs, can be overridden
@@ -141,12 +141,12 @@ NetworkServer* NetworkServer::init(const Config &conf, int num_readers, int num_
 			std::vector<Config *> *children = &cc->children;
 			std::vector<Config *>::iterator it;
 			for(it = children->begin(); it != children->end(); it++){
-				if((*it)->key == "allow"){
+				if((*it)->key == "allow"){ //°×Ãûµ¥ ip ¹ıÂË
 					const char *ip = (*it)->str();
 					log_info("    allow %s", ip);
 					serv->ip_filter->add_allow(ip);
 				}
-				if((*it)->key == "deny"){
+				if((*it)->key == "deny"){ //ºÚÃûµ¥ ip ¹ıÂË
 					const char *ip = (*it)->str();
 					log_info("    deny %s", ip);
 					serv->ip_filter->add_deny(ip);
@@ -192,10 +192,10 @@ NetworkServer* NetworkServer::init(const Config &conf, int num_readers, int num_
 }
 
 void NetworkServer::serve(){
-	writer = new ProcWorkerPool("writer");
-	writer->start(num_writers); //Æô¶¯¶à¸öĞ´Ïß³Ì
-	reader = new ProcWorkerPool("reader");
-	reader->start(num_readers); //Æô¶¯¶à¸ö¶ÁÏß³Ì
+	writer = new ProcWorkerPool("writer"); // WorkerPool<ProcWorker, ProcJob>::WorkerPool
+	writer->start(num_writers); //¿ªÆô num_writers ¸ö writer Ïß³Ì
+	reader = new ProcWorkerPool("reader"); // WorkerPool<ProcWorker, ProcJob>::WorkerPool
+	reader->start(num_readers); //¿ªÆô num_readers ¸ö reader Ïß³Ì
 
 	ready_list_t ready_list;
 	ready_list_t ready_list_2;
@@ -218,7 +218,7 @@ void NetworkServer::serve(){
 			log_info("server running, links: %d", this->link_count);
 		}
 		
-		ready_list.swap(ready_list_2);
+		ready_list.swap(ready_list_2); // ÊÍ·ÅÄÚ´æ
 		ready_list_2.clear();
 		
 		if(!ready_list.empty()){
@@ -234,8 +234,9 @@ void NetworkServer::serve(){
 		
 		for(int i=0; i<(int)events->size(); i++){
 			const Fdevent *fde = events->at(i);
-			if(fde->data.ptr == serv_link){
+			if(fde->data.ptr == serv_link){ //ÏìÓ¦µÄ fd Îª listen µÄÁ´½Ó
 				Link *link = accept_link();
+				//¼àÌıĞ´Èë£¬ÓĞĞÂµÄÁ´½Ó
 				if(link){
 					this->link_count ++;				
 					log_debug("new link from %s:%d, fd: %d, links: %d",
@@ -249,20 +250,19 @@ void NetworkServer::serve(){
 					log_fatal("reading result from workers error!");
 					exit(0);
 				}
-				if(proc_result(job, &ready_list) == PROC_ERROR){
+				if(proc_result(job, &ready_list) == PROC_ERROR){ // ´¦Àíµ¯³öµÄ job
 					//
 				}
-			}else{
+			}else{ // ¶Ï¿ªÁ´½ÓÊ±
 				proc_client_event(fde, &ready_list);
 			}
 		}
 
-		// Õë¶ÔÒÑ¾­ ready µÄ¶ÓÁĞ½øĞĞ´¦Àí
 		for(it = ready_list.begin(); it != ready_list.end(); it ++){
 			Link *link = *it;
-			if(link->error()){ // Á´½ÓÓĞÎÊÌâ(»òÕß¶Ô·½Ö÷¶¯ close ÁË)£¬¶Ï¿ªÁ´½Ó
-				this->link_count --;
-				fdes->del(link->fd());
+			if(link->error()){ // ¶Ï¿ªÁ´½Ó
+				this->link_count --; // ¼õÉÙÁ´½ÓÊı
+				fdes->del(link->fd()); //È¥³ı¸Ä fd µÄ¼àÌı
 				delete link;
 				continue;
 			}
