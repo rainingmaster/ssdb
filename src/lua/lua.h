@@ -12,6 +12,8 @@
 #define DEF_LUA_PROC(f) int lua_proc_##f(lua_State *L)
 #define LUA_ERR "error"
 
+#define lua_ssdb_server "_lua_ssdb_serv"
+
 class Lua{
 	private:
 		void init_global(lua_State *L);
@@ -23,8 +25,6 @@ class Lua{
 		lua_State* L;
 		static Lua* init(NetworkServer *serv);
 };
-
-char *lua_ssdb_server = "_lua_ssdb_serv";
 
 static inline SSDBServer *
 ssdb_lua_get_server(lua_State *L)

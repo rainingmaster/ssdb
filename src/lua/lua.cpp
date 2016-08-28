@@ -5,8 +5,8 @@
 
 static DEF_PROC(lua);
 
-static DEF_LUA_PROC(get);
-static DEF_LUA_PROC(resp);
+DEF_LUA_PROC(get);
+DEF_LUA_PROC(resp);
 
 Lua::Lua(){
     init_global(L);
