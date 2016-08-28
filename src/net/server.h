@@ -13,11 +13,13 @@ found in the LICENSE file.
 #include "fde.h"
 #include "proc.h"
 #include "worker.h"
+#include "../lua/lua.h"
 
 class Link;
 class Config;
 class IpFilter;
 class Fdevents;
+class Lua;
 
 typedef std::vector<Link *> ready_list_t;
 
@@ -54,6 +56,8 @@ public:
 	int link_count;
 	bool need_auth;
 	std::string password;
+    
+    Lua *hlua;
 
 	~NetworkServer();
 	

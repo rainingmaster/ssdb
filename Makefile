@@ -13,6 +13,7 @@ all:
 	cd src/net; ${MAKE}
 	cd src/client; ${MAKE}
 	cd src/ssdb; ${MAKE}
+	cd src/lua; ${MAKE}
 	cd src; ${MAKE}
 	cd tools; ${MAKE}
 
@@ -54,6 +55,7 @@ clean:
 	cd src/util; ${MAKE} clean
 	cd src/ssdb; ${MAKE} clean
 	cd src/net; ${MAKE} clean
+	cd src/lua; ${MAKE} clean
 	cd src; ${MAKE} clean
 	cd tools; ${MAKE} clean
 

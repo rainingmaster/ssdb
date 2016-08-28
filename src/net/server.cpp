@@ -196,6 +196,8 @@ void NetworkServer::serve(){
 	writer->start(num_writers);
 	reader = new ProcWorkerPool("reader");
 	reader->start(num_readers);
+    
+    hlua = Lua::init(this);
 
 	ready_list_t ready_list;
 	ready_list_t ready_list_2;
