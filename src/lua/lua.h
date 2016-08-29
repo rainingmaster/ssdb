@@ -33,6 +33,7 @@ class Lua{
         void lua_cache_load_code();
         void lua_cache_store_code();
         void lua_clfactory_loadfile();
+        void lua_clfactory_getF(lua_State *L, void *ud, size_t *size);
 	public:
 		Lua(lua_State *L);
 		~Lua();
