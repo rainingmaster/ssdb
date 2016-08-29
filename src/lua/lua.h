@@ -10,23 +10,37 @@
 #include "../net/server.h"
 
 #define DEF_LUA_PROC(f) int lua_proc_##f(lua_State *L)
-#define LUA_ERR "error"
 
-#define lua_ssdb_server "_lua_ssdb_serv"
+#define LUA_SSDB_ERR       0
+#define LUA_SSDB_OK        1
+#define LUA_SSDB_DECLINED  2
+
+#define CHECK_LUA_NUM_PARAMS(n) if (lua_gettop(L) < n) { \
+        return luaL_error(L, "wrong number of arguments"); \
+    }
+
+#define lua_ssdb_server   "_lua_ssdb_serv"
+#define lua_ssdb_response "_lua_ssdb_resp"
+
+class SSDBServer;
 
 class Lua{
 	private:
-		void init_global(lua_State *L);
-        void init_proc_kv(lua_State *L);
-        void init_response(lua_State *L);
+        char lua_code_cache_key;
+		void init_global();
+        void init_proc_kv();
+        void init_response();
+        void lua_cache_load_code();
+        void lua_cache_store_code();
+        void lua_clfactory_loadfile();
 	public:
-		Lua();
+		Lua(lua_State *L);
 		~Lua();
 		lua_State* L;
 		static Lua* init(NetworkServer *serv);
 };
 
-static inline SSDBServer *
+static inline SSDBServer*
 ssdb_lua_get_server(lua_State *L)
 {
     SSDBServer *serv;
@@ -39,13 +53,35 @@ ssdb_lua_get_server(lua_State *L)
 }
 
 /*
- * 将整个 serv 作为userdata存在 L 中
+ * store the serv into L as userdata
  */
 static inline void
 ssdb_lua_set_server(lua_State *L, SSDBServer *serv)
 {
     lua_pushlightuserdata(L, serv);
     lua_setglobal(L, lua_ssdb_server);
+}
+
+static inline Response*
+ssdb_lua_get_resp(lua_State *L)
+{
+    Response *resp;
+
+    lua_getglobal(L, lua_ssdb_response);
+    resp = (Response *)lua_touserdata(L, -1);
+    lua_pop(L, 1);
+
+    return resp;
+}
+
+/*
+ * store the resp into L as userdata
+ */
+static inline void
+ssdb_lua_set_resp(lua_State *L, Response *resp)
+{
+    lua_pushlightuserdata(L, resp);
+    lua_setglobal(L, lua_ssdb_response);
 }
 
 #endif

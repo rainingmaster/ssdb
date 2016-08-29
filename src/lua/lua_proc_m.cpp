@@ -8,11 +8,9 @@ found in the LICENSE file.
 #include "../net/proc.h"
 
 int lua_proc_resp(lua_State *L){
-    Bytes req = luaL_checkstring(L, 1);
-    if(req == NULL){
-        lua_pushliteral(L, LUA_ERR);
-        return 1;
-    }
-	lua_pushlstring(L, req.data(), req.size());
+    std::string ret = luaL_checkstring(L, 1);
+
+	Response *resp = ssdb_lua_get_resp(L);
+	resp->push_back(ret);
     return 1;
 }
