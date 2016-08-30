@@ -17,14 +17,15 @@ typedef struct {
     size_t      begin_code_len;
     size_t      end_code_len;
     size_t      rest_len;
-    char       *begin_code;
-    char       *end_code;
+    std::string begin_code;
+    std::string end_code;
     char        buff[4096];
 } lua_clfactory_file_ctx_t;
 
 
 
 static DEF_PROC(lua);
+static DEF_PROC(lua_clear);
 
 DEF_LUA_PROC(get);
 DEF_LUA_PROC(hget);
@@ -34,7 +35,7 @@ DEF_LUA_PROC(resp);
 
 Lua::Lua(lua_State *L){
 	this->L = L;
-    init_global(L);
+    init_global();
 }
 
 Lua::~Lua(){
@@ -53,6 +54,7 @@ Lua* Lua::init(NetworkServer *serv){
 	Lua *vm = new Lua(L);
     
     serv->proc_map.set_proc("lua", "w", proc_lua);
+    serv->proc_map.set_proc("lua_clear", "w", proc_lua_clear);
     
 	return vm;
 }
@@ -71,6 +73,12 @@ void Lua::init_global(){
     lua_pop(L, 2);
 
 	lua_setglobal(L, "ssdb");
+
+	/*registry code cache table*/
+	lua_pushlightuserdata(L, &lua_code_cache_key);
+    lua_createtable(L, 0, 8 /* nrec */);
+    lua_rawset(L, LUA_REGISTRYINDEX);
+
     return;
 }
 
@@ -86,7 +94,7 @@ void Lua::init_response(){
     return;
 }
 
-void Lua::lua_cache_load_code(std::string cache_key){
+int Lua::lua_cache_load_code(){
 	int          rc;
     u_char      *err;
 
@@ -98,7 +106,7 @@ void Lua::lua_cache_load_code(std::string cache_key){
         return LUA_SSDB_ERR;
     }
 
-    lua_getfield(L, -1, cache_key);    /*  sp++ */
+    lua_getfield(L, -1, cache_key.c_str());    /*  sp++ */
 
     if (lua_isfunction(L, -1)) {
         /*  call closure factory to gen new closure */
@@ -127,7 +135,7 @@ void Lua::lua_cache_load_code(std::string cache_key){
     return LUA_SSDB_DECLINED;
 }
 
-void Lua::lua_cache_store_code(std::string cache_key){
+int Lua::lua_cache_store_code(){
     int rc;
 
     /*  get code cache table */
@@ -140,7 +148,7 @@ void Lua::lua_cache_store_code(std::string cache_key){
 
     lua_pushvalue(L, -2); /* closure cache closure */
     /* ngx_http_lua_code_cache_key[key] = code */
-    lua_setfield(L, -2, cache_key); /* closure cache */
+    lua_setfield(L, -2, cache_key.c_str()); /* closure cache */
 
     /*  remove cache table, leave closure factory at top of stack */
     lua_pop(L, 1); /* closure */
@@ -154,28 +162,26 @@ void Lua::lua_cache_store_code(std::string cache_key){
     return LUA_SSDB_OK;
 }
 
-void Lua::lua_clfactory_loadfile(std::string filename){
-    int                         c, status, readstatus;
-    ngx_flag_t                  sharp;
+int Lua::lua_clfactory_loadfile(std::string filename){
+    int                             status, readstatus;
 
     lua_clfactory_file_ctx_t        lf;
 
     /* index of filename on the stack */
     int                         fname_index;
 
-    sharp = 0;
     fname_index = lua_gettop(L) + 1;
 
     lf.extraline = 0;
 
-    lf.begin_code.ptr = CLFACTORY_BEGIN_CODE; //return function() 
+    lf.begin_code = CLFACTORY_BEGIN_CODE; //return function() 
     lf.begin_code_len = CLFACTORY_BEGIN_SIZE;
-    lf.end_code.ptr = CLFACTORY_END_CODE; // \nend
+    lf.end_code = CLFACTORY_END_CODE; // \nend
     lf.end_code_len = CLFACTORY_END_SIZE;
 
-    lua_pushfstring(L, "@%s", filename);
+    lua_pushfstring(L, "@%s", filename.c_str());
 
-    lf.f = fopen(filename, "r");
+    lf.f = fopen(filename.c_str(), "r");
 
 	// set the sent status
     lf.sent_begin = lf.sent_end = 0;
@@ -185,17 +191,15 @@ void Lua::lua_clfactory_loadfile(std::string filename){
 
     readstatus = ferror(lf.f);
 
-    if (filename) {
-        fclose(lf.f);  /* close file (even in case of errors) */
-    }
+    fclose(lf.f);
 
     lua_remove(L, fname_index);
 
     return status;
 }
 
-void Lua::lua_clfactory_getF(lua_State *L, void *ud, size_t *size){
-    char                        *buf;
+const char *
+Lua::lua_clfactory_getF(lua_State *L, void *ud, size_t *size){
     size_t                       num;
 
     lua_clfactory_file_ctx_t        *lf;
@@ -211,9 +215,8 @@ void Lua::lua_clfactory_getF(lua_State *L, void *ud, size_t *size){
     if (lf->sent_begin == 0) {
         lf->sent_begin = 1;
         *size = lf->begin_code_len;
-        buf = lf->begin_code.ptr;
 
-        return buf;
+        return lf->begin_code.c_str();
     }
 
     num = fread(lf->buff, 1, sizeof(lf->buff), lf->f);
@@ -222,9 +225,8 @@ void Lua::lua_clfactory_getF(lua_State *L, void *ud, size_t *size){
         if (lf->sent_end == 0) {
             lf->sent_end = 1;
             *size = lf->end_code_len;
-            buf = lf->end_code.ptr;
 
-            return buf;
+            return lf->end_code.c_str();
         }
 
         *size = 0;
@@ -235,28 +237,97 @@ void Lua::lua_clfactory_getF(lua_State *L, void *ud, size_t *size){
     return lf->buff;
 }
 
-static int proc_lua(NetworkServer *net, Link *link, const Request &req, Response *resp){
-    lua_State *L = net->hlua->L;
-	ssdb_lua_set_resp(L, resp);
-	std::string filepath = "hello.lua";
-	std::string cache_key = "cache:" + filepath
-    
-    //TODO:store the code in L as cache
-    int bRet = luaL_loadfile(L, "hello.lua");
-    if(bRet)  
-    {  
-        resp->push_back("file_error");
-        return 0;
+int Lua::lua_cache_loadfile(std::string filepath) {
+	cache_key = "cache:" + filepath;
+
+	int rc = lua_cache_load_code();
+    if (rc == LUA_SSDB_OK) {
+        /*  code chunk loaded from cache, sp++ */
+        return LUA_SSDB_OK;
     }
 
-    bRet = lua_pcall(L, 0, 0, 0);  
-    if(bRet)  
-    {  
-        resp->push_back("run_error");
-        return 0;
+    if (rc == LUA_SSDB_ERR) {
+        return LUA_SSDB_ERR;
     }
+
+    /*  load closure factory of script file to the top of lua stack, sp++ */
+    rc = lua_clfactory_loadfile(filepath);
+
+	/* error lua code
+    if (rc != 0) {
+        switch (rc) {
+        case LUA_ERRMEM:
+            err = "memory allocation error";
+            break;
+
+        case LUA_ERRFILE:
+            errcode = NGX_HTTP_NOT_FOUND;
+
+        default:
+            if (lua_isstring(L, -1)) {
+                err = lua_tostring(L, -1);
+
+            } else {
+                err = "unknown error";
+            }
+        }
+
+        goto error;
+    }
+    */
+
+    /*  store closure factory and gen new closure at the top of lua stack
+     *  to code cache */
+    rc = lua_cache_store_code();
+
+    return LUA_SSDB_OK;
+}
+
+int Lua::lua_clear_file_cache(std::string filepath){
+	cache_key = "cache:" + filepath;
+    lua_pushlightuserdata(L, &lua_code_cache_key);
+    lua_rawget(L, LUA_REGISTRYINDEX);    /*  sp++ */
+
+    if (!lua_istable(L, -1)) {
+        return LUA_SSDB_ERR;
+    }
+
+	lua_pushnil(L); /* del cache closure */
+    lua_setfield(L, -2, cache_key.c_str());
+
+    lua_pop(L, 2);
+}
+
+static int proc_lua(NetworkServer *net, Link *link, const Request &req, Response *resp){
+	Lua *hlua = net->hlua;
+    lua_State *L = hlua->L;
+	ssdb_lua_set_resp(L, resp);
+	std::string filepath (req[1].data(), req[1].size());
+	
+	hlua->lua_cache_loadfile(filepath);
+
+	if (lua_isfunction(L, -1)) {
+         int bRet = lua_pcall(L, 0, 0, 0);
+         if(bRet) 
+         {
+              resp->push_back("run_error");
+              return 0;
+         }
+     }
 
     //TODO:return the result from lua
+	resp->push_back("ok");
+	return 0;
+}
+
+static int proc_lua_clear(NetworkServer *net, Link *link, const Request &req, Response *resp){
+	Lua *hlua = net->hlua;
+    lua_State *L = hlua->L;
+	ssdb_lua_set_resp(L, resp);
+	std::string filepath (req[1].data(), req[1].size());
+	
+	hlua->lua_clear_file_cache(filepath);
+
 	resp->push_back("ok");
 	return 0;
 }

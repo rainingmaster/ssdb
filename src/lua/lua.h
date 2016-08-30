@@ -27,17 +27,20 @@ class SSDBServer;
 class Lua{
 	private:
         char lua_code_cache_key;
+        std::string cache_key;
 		void init_global();
         void init_proc_kv();
         void init_response();
-        void lua_cache_load_code();
-        void lua_cache_store_code();
-        void lua_clfactory_loadfile();
-        void lua_clfactory_getF(lua_State *L, void *ud, size_t *size);
+        int lua_cache_load_code();
+        int lua_cache_store_code();
+        int lua_clfactory_loadfile(std::string filename);
+        static const char * lua_clfactory_getF(lua_State *L, void *ud, size_t *size);
 	public:
 		Lua(lua_State *L);
 		~Lua();
 		lua_State* L;
+        int lua_cache_loadfile(std::string filepath);
+        int lua_clear_file_cache(std::string filepath);
 		static Lua* init(NetworkServer *serv);
 };
 

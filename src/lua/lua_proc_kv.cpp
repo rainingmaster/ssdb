@@ -27,7 +27,7 @@ int lua_proc_hget(lua_State *L){
     Bytes key = lua_tostring(L, 2);
 
 	std::string val;
-	int ret = serv->ssdb->hget(hash, key, &val);
+	serv->ssdb->hget(hash, key, &val);
 	lua_pushlstring(L, val.data(), val.size());
 	return 0;
 }
@@ -55,11 +55,11 @@ int lua_proc_zscan(lua_State *L){
 	CHECK_LUA_NUM_PARAMS(5);
 	SSDBServer *serv = ssdb_lua_get_server(L);
 
-	uint64_t limit = lua_checkint(L, 5);
+	uint64_t limit = luaL_checkint(L, 5);
 	uint64_t offset = 0;
 	if(lua_gettop(L) > 6){
 		offset = limit;
-		limit = offset + lua_checkint(L, 6);
+		limit = offset + luaL_checkint(L, 6);
 	}
     Bytes req1 = lua_tostring(L, 1);
     Bytes req2 = lua_tostring(L, 2);
