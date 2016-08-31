@@ -88,4 +88,21 @@ ssdb_lua_set_resp(lua_State *L, Response *resp)
     lua_setglobal(L, lua_ssdb_response);
 }
 
+/*
+ * push the return value into lua stack
+ */
+static inline void
+ssdb_lua_push_str(lua_State *L, int status, std::string val)
+{
+    if(status == -1){ //error
+        lua_pushliteral(L, "error");
+        lua_pushnil(L);
+    } else if(status == 0){ //not_found
+        lua_pushliteral(L, "not_found");
+        lua_pushnil(L);
+    } else {
+        lua_pushlstring(L, val.data(), val.size());
+    }
+}
+
 #endif

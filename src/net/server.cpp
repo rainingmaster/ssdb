@@ -95,6 +95,8 @@ NetworkServer::~NetworkServer(){
 	delete writer;
 	reader->stop();
 	delete reader;
+
+	delete hlua;
 }
 
 NetworkServer* NetworkServer::init(const char *conf_file, int num_readers, int num_writers){

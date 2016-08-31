@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "lua.h"
+#include "../util/log.h"
 
 #define CLFACTORY_BEGIN_CODE "return function() "
 #define CLFACTORY_BEGIN_SIZE (sizeof(CLFACTORY_BEGIN_CODE) - 1)
@@ -39,6 +40,7 @@ Lua::Lua(lua_State *L){
 }
 
 Lua::~Lua(){
+	lua_close(L);
 }
 
 Lua* Lua::init(NetworkServer *serv){
@@ -85,6 +87,12 @@ void Lua::init_global(){
 void Lua::init_proc_kv(){
     lua_pushcfunction(L, lua_proc_get);
     lua_setfield(L, -2, "get");
+    lua_pushcfunction(L, lua_proc_hget);
+    lua_setfield(L, -2, "hget");
+    lua_pushcfunction(L, lua_proc_hgetall);
+    lua_setfield(L, -2, "hgetall");
+    lua_pushcfunction(L, lua_proc_zscan);
+    lua_setfield(L, -2, "zscan");
     return;
 }
 
@@ -239,6 +247,9 @@ Lua::lua_clfactory_getF(lua_State *L, void *ud, size_t *size){
 
 int Lua::lua_cache_loadfile(std::string filepath) {
 	cache_key = "cache:" + filepath;
+    const char      *err = NULL;
+
+    int n = lua_gettop(L);
 
 	int rc = lua_cache_load_code();
     if (rc == LUA_SSDB_OK) {
@@ -253,7 +264,6 @@ int Lua::lua_cache_loadfile(std::string filepath) {
     /*  load closure factory of script file to the top of lua stack, sp++ */
     rc = lua_clfactory_loadfile(filepath);
 
-	/* error lua code
     if (rc != 0) {
         switch (rc) {
         case LUA_ERRMEM:
@@ -261,7 +271,7 @@ int Lua::lua_cache_loadfile(std::string filepath) {
             break;
 
         case LUA_ERRFILE:
-            errcode = NGX_HTTP_NOT_FOUND;
+            err = "not found";
 
         default:
             if (lua_isstring(L, -1)) {
@@ -274,13 +284,17 @@ int Lua::lua_cache_loadfile(std::string filepath) {
 
         goto error;
     }
-    */
 
     /*  store closure factory and gen new closure at the top of lua stack
      *  to code cache */
     rc = lua_cache_store_code();
 
     return LUA_SSDB_OK;
+
+
+error:
+    lua_settop(L, n);
+    return LUA_SSDB_ERR;
 }
 
 int Lua::lua_clear_file_cache(std::string filepath){
@@ -295,9 +309,11 @@ int Lua::lua_clear_file_cache(std::string filepath){
 	lua_pushnil(L); /* del cache closure */
     lua_setfield(L, -2, cache_key.c_str());
 
-    lua_pop(L, 2);
+    lua_pop(L, 1);
 }
 
+
+//TODO:a new method in lua for read through thread
 static int proc_lua(NetworkServer *net, Link *link, const Request &req, Response *resp){
 	Lua *hlua = net->hlua;
     lua_State *L = hlua->L;
@@ -307,16 +323,18 @@ static int proc_lua(NetworkServer *net, Link *link, const Request &req, Response
 	hlua->lua_cache_loadfile(filepath);
 
 	if (lua_isfunction(L, -1)) {
-         int bRet = lua_pcall(L, 0, 0, 0);
-         if(bRet) 
-         {
-              resp->push_back("run_error");
-              return 0;
-         }
-     }
+		int bRet = lua_pcall(L, 0, 0, 0);
+		if(bRet) 
+		{
+    		//TODO:echo the error to the log file instand of return data
+			std::string err = lua_tostring(L,-1);
+ 			log_error("lua code error: %s", err.data());
+			lua_pop(L, 1);
+			resp->push_back("run_error");
+			return 0;
+		}
+	}
 
-    //TODO:return the result from lua
-	resp->push_back("ok");
 	return 0;
 }
 

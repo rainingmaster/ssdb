@@ -15,8 +15,8 @@ int lua_proc_get(lua_State *L){
     Bytes req = lua_tostring(L, 1);
 
 	std::string val;
-	serv->ssdb->get(req, &val);
-	lua_pushlstring(L, val.data(), val.size());
+	int ret = serv->ssdb->get(req, &val);
+	ssdb_lua_push_str(L, ret, val);
     return 1;
 }
 
@@ -27,9 +27,9 @@ int lua_proc_hget(lua_State *L){
     Bytes key = lua_tostring(L, 2);
 
 	std::string val;
-	serv->ssdb->hget(hash, key, &val);
-	lua_pushlstring(L, val.data(), val.size());
-	return 0;
+	int ret = serv->ssdb->hget(hash, key, &val);
+	ssdb_lua_push_str(L, ret, val);
+	return 1;
 }
 
 int lua_proc_hgetall(lua_State *L){
@@ -78,6 +78,6 @@ int lua_proc_zscan(lua_State *L){
 	    lua_rawset(L, -3);
 	}
 	delete it;
-	return 0;
+	return 1;
 }
 
