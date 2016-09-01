@@ -26,22 +26,26 @@ class SSDBServer;
 
 class Lua{
 	private:
-        char lua_code_cache_key;
-        std::string cache_key;
-		void init_global();
-        void init_proc_kv();
-        void init_response();
-        int lua_cache_load_code();
-        int lua_cache_store_code();
-        int lua_clfactory_loadfile(std::string filename);
-        static const char * lua_clfactory_getF(lua_State *L, void *ud, size_t *size);
+		lua_State*            L;
+        char                  lua_code_cache_key;
+		void                  init_global();
+        void                  init_proc_kv();
+        void                  init_response();
+        int                   lua_cache_load_code(std::string cache_key);
+        int                   lua_cache_store_code(std::string cache_key);
+        int                   lua_clfactory_loadfile(std::string filename);
+        int                   lua_cache_loadfile(std::string filepath);
+        lua_State*            lua_new_thread();
+        static const char*    lua_clfactory_getF(lua_State *L, void *ud, size_t *size);
 	public:
 		Lua(lua_State *L);
 		~Lua();
-		lua_State* L;
-        int lua_cache_loadfile(std::string filepath);
-        int lua_clear_file_cache(std::string filepath);
-		static Lua* init(NetworkServer *serv);
+		static                Lua* init(NetworkServer *serv);
+        int                   lua_clear_file_cache(std::string filepath);
+		int                   lua_set_ssdb_resp(Response *resp);
+        int                   lua_set_ssdb_serv(SSDBServer *serv);
+		int                   lua_execute_by_filepath(std::string filepath);
+        int                   lua_execute_by_thread(std::string filepath);
 };
 
 static inline SSDBServer*
