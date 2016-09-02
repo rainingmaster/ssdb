@@ -354,29 +354,27 @@ int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
 	if (lua_isfunction(L, -1)) {
         lua_State *co = lua_new_thread();
 
-        /*  set closure's env table to new coroutine's globals table, to store the resp */
-        
-        lua_createtable(co, 0, 1);
-        lua_pushvalue(co, -1);
-        lua_setfield(co, -2, "_G");
-        
-        lua_createtable(co, 0, 1);
+        /* inherit the L's global table to be __index */
         lua_pushvalue(co, LUA_GLOBALSINDEX);
-        lua_setfield(co, -2, "__index");
+        lua_setfield(co, -1, "__index");
+        
+        /*  set closure's env table to new coroutine's globals table, to store the resp */
+        lua_createtable(co, 0, 1);
         lua_replace(co, LUA_GLOBALSINDEX);
+        
+        /* set the global table to env */
+        lua_pushvalue(co, LUA_GLOBALSINDEX);
+        lua_setfenv(co, -1);
 
         //copy the code to co
         lua_xmove(L, co, 1);
         
-        lua_pushvalue(co, LUA_GLOBALSINDEX);
-        lua_setfenv(co, -2);
-        
         mutex.unlock();
 
+        /* add the response to the new gobal table */
         ssdb_lua_set_resp(co, resp);
         int bRet = lua_resume(co, 0);
-        
-        lua_close(co);
+
 		if(bRet) 
 		{
     		//TODO:echo the error to the log file instand of return data
