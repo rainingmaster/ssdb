@@ -105,7 +105,7 @@ void Lua::init_response(){
     return;
 }
 
-int Lua::lua_cache_load_code(std::string cache_key){
+int Lua::lua_cache_load_code(std::string *cache_key){
 	int          rc;
     u_char      *err;
 
@@ -117,7 +117,7 @@ int Lua::lua_cache_load_code(std::string cache_key){
         return LUA_SSDB_ERR;
     }
 
-    lua_getfield(L, -1, cache_key.c_str());    /*  sp++ */
+    lua_getfield(L, -1, cache_key->c_str());    /*  sp++ */
 
     if (lua_isfunction(L, -1)) {
         /*  call closure factory to gen new closure */
@@ -146,7 +146,7 @@ int Lua::lua_cache_load_code(std::string cache_key){
     return LUA_SSDB_DECLINED;
 }
 
-int Lua::lua_cache_store_code(std::string cache_key){
+int Lua::lua_cache_store_code(std::string *cache_key){
     int rc;
 
     /*  get code cache table */
@@ -158,8 +158,8 @@ int Lua::lua_cache_store_code(std::string cache_key){
     }
 
     lua_pushvalue(L, -2); /* closure cache closure */
-    /* ngx_http_lua_code_cache_key[key] = code */
-    lua_setfield(L, -2, cache_key.c_str()); /* closure cache */
+    /* lua_code_cache_key[key] = code */
+    lua_setfield(L, -2, cache_key->c_str()); /* closure cache */
 
     /*  remove cache table, leave closure factory at top of stack */
     lua_pop(L, 1); /* closure */
@@ -173,7 +173,7 @@ int Lua::lua_cache_store_code(std::string cache_key){
     return LUA_SSDB_OK;
 }
 
-int Lua::lua_clfactory_loadfile(std::string filename){
+int Lua::lua_clfactory_loadfile(std::string *filename){
     int                             status, readstatus;
 
     lua_clfactory_file_ctx_t        lf;
@@ -190,9 +190,9 @@ int Lua::lua_clfactory_loadfile(std::string filename){
     lf.end_code = CLFACTORY_END_CODE; // \nend
     lf.end_code_len = CLFACTORY_END_SIZE;
 
-    lua_pushfstring(L, "@%s", filename.c_str());
+    lua_pushfstring(L, "@%s", filename->c_str());
 
-    lf.f = fopen(filename.c_str(), "r");
+    lf.f = fopen(filename->c_str(), "r");
 
 	// set the sent status
     lf.sent_begin = lf.sent_end = 0;
@@ -248,13 +248,13 @@ Lua::lua_clfactory_getF(lua_State *L, void *ud, size_t *size){
     return lf->buff;
 }
 
-int Lua::lua_cache_loadfile(std::string filepath) {
-	std::string cache_key = "cache:" + filepath;
+int Lua::lua_cache_loadfile(std::string *filename) {
+	std::string cache_key = "cache:" + (*filename);
     const char      *err = NULL;
 
     int n = lua_gettop(L);
 
-	int rc = lua_cache_load_code(cache_key);
+	int rc = lua_cache_load_code(&cache_key);
     if (rc == LUA_SSDB_OK) {
         /*  code chunk loaded from cache, sp++ */
         return LUA_SSDB_OK;
@@ -265,7 +265,7 @@ int Lua::lua_cache_loadfile(std::string filepath) {
     }
 
     /*  load closure factory of script file to the top of lua stack, sp++ */
-    rc = lua_clfactory_loadfile(filepath);
+    rc = lua_clfactory_loadfile(filename);
 
     if (rc != 0) {
         switch (rc) {
@@ -290,7 +290,7 @@ int Lua::lua_cache_loadfile(std::string filepath) {
 
     /*  store closure factory and gen new closure at the top of lua stack
      *  to code cache */
-    rc = lua_cache_store_code(cache_key);
+    rc = lua_cache_store_code(&cache_key);
 
     return LUA_SSDB_OK;
 
@@ -300,8 +300,8 @@ error:
     return LUA_SSDB_ERR;
 }
 
-int Lua::lua_clear_file_cache(std::string filepath){
-	std::string cache_key = "cache:" + filepath;
+int Lua::lua_clear_file_cache(std::string *filename){
+	std::string cache_key = "cache:" + (*filename);
     lua_pushlightuserdata(L, &lua_code_cache_key);
     lua_rawget(L, LUA_REGISTRYINDEX);    /*  sp++ */
 
@@ -328,21 +328,11 @@ Lua::lua_new_thread(){
     return co;
 }
 
-int Lua::lua_set_ssdb_resp(Response *resp){
-	ssdb_lua_set_resp(L, resp);
-    return LUA_SSDB_OK;
-}
-
-int Lua::lua_set_ssdb_serv(SSDBServer *serv){
-	ssdb_lua_set_server(L, serv);
-    return LUA_SSDB_OK;
-}
-
-int Lua::lua_execute_by_filepath(std::string filepath){
-	lua_cache_loadfile(filepath);
-    Response *resp = ssdb_lua_get_resp(L);
+int Lua::lua_execute_by_filename(std::string *filename, Response *resp){
+	lua_cache_loadfile(filename);
 
 	if (lua_isfunction(L, -1)) {
+        ssdb_lua_set_resp(L, resp);
 		int bRet = lua_pcall(L, 0, 0, 0);
 		if(bRet) 
 		{
@@ -357,16 +347,36 @@ int Lua::lua_execute_by_filepath(std::string filepath){
     return LUA_SSDB_ERR;
 }
 
-int Lua::lua_execute_by_thread(std::string filepath){
-    lua_cache_loadfile(filepath);
-    Response *resp = ssdb_lua_get_resp(L);
+int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
+    mutex.lock();
+    lua_cache_loadfile(filename);
 
 	if (lua_isfunction(L, -1)) {
         lua_State *co = lua_new_thread();
+
+        /*  set closure's env table to new coroutine's globals table, to store the resp */
         
+        lua_createtable(co, 0, 1);
+        lua_pushvalue(co, -1);
+        lua_setfield(co, -2, "_G");
+        
+        lua_createtable(co, 0, 1);
+        lua_pushvalue(co, LUA_GLOBALSINDEX);
+        lua_setfield(co, -2, "__index");
+        lua_replace(co, LUA_GLOBALSINDEX);
+
         //copy the code to co
         lua_xmove(L, co, 1);
+        
+        lua_pushvalue(co, LUA_GLOBALSINDEX);
+        lua_setfenv(co, -2);
+        
+        mutex.unlock();
+
+        ssdb_lua_set_resp(co, resp);
         int bRet = lua_resume(co, 0);
+        
+        lua_close(co);
 		if(bRet) 
 		{
     		//TODO:echo the error to the log file instand of return data
@@ -377,7 +387,9 @@ int Lua::lua_execute_by_thread(std::string filepath){
 			return LUA_SSDB_ERR;
 		}
         return LUA_SSDB_OK;
-	}
+	}else{
+        mutex.unlock();
+    }
     return LUA_SSDB_ERR;
 }
 
@@ -385,10 +397,8 @@ int Lua::lua_execute_by_thread(std::string filepath){
 static int proc_lua(NetworkServer *net, Link *link, const Request &req, Response *resp){
 	Lua *hlua = net->hlua;
 
-	hlua->lua_set_ssdb_resp(resp);
-
-	std::string filepath (req[1].data(), req[1].size());
-	hlua->lua_execute_by_filepath(filepath);
+	std::string filename = req[1].String();
+	hlua->lua_execute_by_filename(&filename, resp);
 
 	return 0;
 }
@@ -397,10 +407,8 @@ static int proc_lua_thread(NetworkServer *net, Link *link, const Request &req, R
     //use a lua_newthread to excute the file, and use the ssdb's thread worker
 	Lua *hlua = net->hlua;
 
-	hlua->lua_set_ssdb_resp(resp);
-
-	std::string filepath (req[1].data(), req[1].size());
-	hlua->lua_execute_by_thread(filepath);
+	std::string filename = req[1].String();
+	hlua->lua_execute_by_thread(&filename, resp);
 
 	return 0;
 }
@@ -408,8 +416,8 @@ static int proc_lua_thread(NetworkServer *net, Link *link, const Request &req, R
 static int proc_lua_clear(NetworkServer *net, Link *link, const Request &req, Response *resp){
 	Lua *hlua = net->hlua;
     
-	std::string filepath (req[1].data(), req[1].size());
-	hlua->lua_clear_file_cache(filepath);
+	std::string filename = req[1].String();
+	hlua->lua_clear_file_cache(&filename);
 
 	resp->push_back("ok");
 	return 0;
