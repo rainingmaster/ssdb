@@ -83,6 +83,11 @@ void Lua::init_global(){
 	lua_pushlightuserdata(L, &lua_code_cache_key);
     lua_createtable(L, 0, 8 /* nrec */);
     lua_rawset(L, LUA_REGISTRYINDEX);
+    
+	/*registry coroutine's keys table*/
+    lua_pushlightuserdata(L, &lua_coroutines_key);
+    lua_createtable(L, 0, 32 /* nrec */);
+    lua_rawset(L, LUA_REGISTRYINDEX);
 
     return;
 }
@@ -317,15 +322,58 @@ int Lua::lua_clear_file_cache(std::string *filename){
 
 lua_State*
 Lua::lua_new_thread(){
-    int              base;
+    int              base, ref;
     lua_State       *co;
 
     base = lua_gettop(L);
 
+    lua_pushlightuserdata(L, &lua_coroutines_key);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+
     co = lua_newthread(L);
 
-    lua_settop(L, base);
+    /* inherit the L's global table to be __index */
+    lua_pushvalue(co, LUA_GLOBALSINDEX);
+    lua_setfield(co, -1, "__index");
+    
+    /*  set closure's env table to new coroutine's globals table, to store the resp */
+    lua_createtable(co, 0, 1);
+    lua_replace(co, LUA_GLOBALSINDEX);
+    
+    /* set the global table to env */
+    lua_pushvalue(co, LUA_GLOBALSINDEX);
+    lua_setfenv(co, -1);
+    
+    /* add a reference to avoid co be collected */
+    ref = luaL_ref(L, -2);
+    if(ref == LUA_NOREF) {
+        lua_settop(L, base); /* restore main thread stack */
+        return NULL;
+    }
+
+    lua_pushinteger(co, ref);
+    lua_setglobal(co, lua_ssdb_reference); //TODO: may be it is danger to put the refer in global table
+
+    lua_settop(L, base); /* restore main thread stack */
+
+    /* copy the code to co */
+    lua_xmove(L, co, 1);
+
     return co;
+}
+
+void
+Lua::lua_del_thread(lua_State *co){
+    int              ref;
+
+    lua_getglobal(co, lua_ssdb_reference);
+    ref = (int)lua_tonumber(co, -1);
+
+    lua_pushlightuserdata(L, &lua_coroutines_key);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+    luaL_unref(L, -1, ref);
+    
+    return;
 }
 
 int Lua::lua_execute_by_filename(std::string *filename, Response *resp){
@@ -348,28 +396,16 @@ int Lua::lua_execute_by_filename(std::string *filename, Response *resp){
 }
 
 int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
-    mutex.lock();
+    c_mutex.lock();
     lua_cache_loadfile(filename);
 
 	if (lua_isfunction(L, -1)) {
         lua_State *co = lua_new_thread();
+        c_mutex.unlock();
 
-        /* inherit the L's global table to be __index */
-        lua_pushvalue(co, LUA_GLOBALSINDEX);
-        lua_setfield(co, -1, "__index");
-        
-        /*  set closure's env table to new coroutine's globals table, to store the resp */
-        lua_createtable(co, 0, 1);
-        lua_replace(co, LUA_GLOBALSINDEX);
-        
-        /* set the global table to env */
-        lua_pushvalue(co, LUA_GLOBALSINDEX);
-        lua_setfenv(co, -1);
-
-        //copy the code to co
-        lua_xmove(L, co, 1);
-        
-        mutex.unlock();
+        if(NULL == co) {
+			return LUA_SSDB_ERR;
+        }
 
         /* add the response to the new gobal table */
         ssdb_lua_set_resp(co, resp);
@@ -382,12 +418,20 @@ int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
  			log_error("lua code error: %s", err.data());
 			lua_pop(co, 1);
 			resp->push_back("run_error");
+
+            d_mutex.lock();
+            lua_del_thread(co);
+            d_mutex.unlock();
 			return LUA_SSDB_ERR;
 		}
+
+        d_mutex.lock();
+        lua_del_thread(co);
+        d_mutex.unlock();
         return LUA_SSDB_OK;
-	}else{
-        mutex.unlock();
-    }
+	}
+    
+    c_mutex.unlock();
     return LUA_SSDB_ERR;
 }
 

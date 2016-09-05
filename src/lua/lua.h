@@ -20,8 +20,9 @@
         return luaL_error(L, "wrong number of arguments"); \
     }
 
-#define lua_ssdb_server   "_lua_ssdb_serv"
-#define lua_ssdb_response "_lua_ssdb_resp"
+#define lua_ssdb_server    "_lua_ssdb_serv"
+#define lua_ssdb_response  "_lua_ssdb_resp"
+#define lua_ssdb_reference "_lua_ssdb_refer_key"
 
 class SSDBServer;
 
@@ -29,6 +30,7 @@ class Lua{
 	private:
 		lua_State*            L;
         char                  lua_code_cache_key;
+        char                  lua_coroutines_key;
 		void                  init_global();
         void                  init_proc_kv();
         void                  init_response();
@@ -37,8 +39,10 @@ class Lua{
         int                   lua_clfactory_loadfile(std::string *filename);
         int                   lua_cache_loadfile(std::string *filename);
         lua_State*            lua_new_thread();
+        void                  lua_del_thread(lua_State *co);
         static const char*    lua_clfactory_getF(lua_State *L, void *ud, size_t *size);
-        Mutex                 mutex;
+        Mutex                 c_mutex;
+        Mutex                 d_mutex;
 	public:
 		Lua(lua_State *L);
 		~Lua();
