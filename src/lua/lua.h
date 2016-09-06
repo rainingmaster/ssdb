@@ -52,6 +52,28 @@ class Lua{
         int                   lua_execute_by_thread(std::string *filename, Response *resp);
 };
 
+class CAutoLock {
+    public:  
+        CAutoLock(Mutex& mutexLock):m_mutexLock(mutexLock)
+        {  
+            m_mutexLock.lock();
+        };
+
+        ~CAutoLock(){  
+            m_mutexLock.unlock();
+        };
+
+        unlock() {
+            m_mutexLock.unlock();
+        };
+
+        unlock() {
+            m_mutexLock.lock();
+        };
+    private:
+        Mutex& m_mutexLock;
+};
+
 static inline SSDBServer*
 ssdb_lua_get_server(lua_State *L)
 {

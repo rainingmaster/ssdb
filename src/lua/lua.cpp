@@ -401,12 +401,12 @@ int Lua::lua_execute_by_filename(std::string *filename, Response *resp){
 }
 
 int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
-    mutex.lock();
+    CAutoLock autolock(mutex);
     lua_cache_loadfile(filename);
 
 	if (lua_isfunction(L, -1)) {
         lua_State *co = lua_new_thread();
-        mutex.unlock();
+        autolock.unlock();
 
         if(NULL == co) {
 			return LUA_SSDB_ERR;
@@ -432,7 +432,7 @@ int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
         return LUA_SSDB_OK;
 	}
     
-    mutex.unlock();
+    autolock.unlock();
     return LUA_SSDB_ERR;
 }
 
