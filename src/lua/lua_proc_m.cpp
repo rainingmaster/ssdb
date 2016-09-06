@@ -11,6 +11,10 @@ int lua_proc_resp(lua_State *L){
     std::string ret = luaL_checkstring(L, 1);
 
 	Response *resp = ssdb_lua_get_resp(L);
-	resp->push_back(ret);
+    if(resp){
+        resp->push_back(ret);
+    }else{
+        log_error("null resp in lua table");
+    }
     return 1;
 }

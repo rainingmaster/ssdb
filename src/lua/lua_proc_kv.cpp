@@ -11,6 +11,10 @@ found in the LICENSE file.
 int lua_proc_get(lua_State *L){
 	CHECK_LUA_NUM_PARAMS(1);
 	SSDBServer *serv = ssdb_lua_get_server(L);
+    if(NULL == serv){
+        log_error("null serv in lua table");
+        return 0;
+    }
     
     Bytes req = lua_tostring(L, 1);
 
@@ -23,6 +27,11 @@ int lua_proc_get(lua_State *L){
 int lua_proc_hget(lua_State *L){
 	CHECK_LUA_NUM_PARAMS(2);
 	SSDBServer *serv = ssdb_lua_get_server(L);
+    if(NULL == serv){
+        log_error("null serv in lua table");
+        return 0;
+    }
+
     Bytes hash = lua_tostring(L, 1);
     Bytes key = lua_tostring(L, 2);
 
@@ -35,6 +44,10 @@ int lua_proc_hget(lua_State *L){
 int lua_proc_hgetall(lua_State *L){
 	CHECK_LUA_NUM_PARAMS(1);
 	SSDBServer *serv = ssdb_lua_get_server(L);
+    if(NULL == serv){
+        log_error("null serv in lua table");
+        return 0;
+    }
 
     Bytes req = lua_tostring(L, 1);
 	//return a table, use the hash key and value
@@ -54,6 +67,10 @@ int lua_proc_hgetall(lua_State *L){
 int lua_proc_zscan(lua_State *L){
 	CHECK_LUA_NUM_PARAMS(5);
 	SSDBServer *serv = ssdb_lua_get_server(L);
+    if(NULL == serv){
+        log_error("null serv in lua table");
+        return 0;
+    }
 
 	uint64_t limit = luaL_checkint(L, 5);
 	uint64_t offset = 0;
