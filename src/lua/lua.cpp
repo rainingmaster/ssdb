@@ -26,7 +26,6 @@ typedef struct {
 
 
 static DEF_PROC(lua);
-static DEF_PROC(lua_thread);
 static DEF_PROC(lua_clear);
 
 DEF_LUA_PROC(get);
@@ -38,6 +37,8 @@ DEF_LUA_PROC(resp);
 Lua::Lua(lua_State *L){
 	this->L = L;
     init_global();
+    worker = new LuaWorkerPool("lua thread");
+	worker->start(10);
 }
 
 Lua::~Lua(){
@@ -58,8 +59,21 @@ Lua* Lua::init(NetworkServer *serv){
 	Lua *vm = new Lua(L);
     
     serv->proc_map.set_proc("lua", "w", proc_lua);
-    serv->proc_map.set_proc("lua_thread", "rt", proc_lua_thread);
     serv->proc_map.set_proc("lua_clear", "w", proc_lua_clear);
+    
+	return vm;
+}
+
+/* without the server, init in thread */
+Lua* Lua::init(){
+	lua_State *L = luaL_newstate();
+    if (L == NULL) {
+		fprintf(stderr, "faile to new a lua vm");
+		exit(1);
+	}
+    luaL_openlibs(L);
+
+	Lua *vm = new Lua(L);
     
 	return vm;
 }
@@ -83,11 +97,6 @@ void Lua::init_global(){
 	lua_pushlightuserdata(L, &lua_code_cache_key);
     lua_createtable(L, 0, 8 /* nrec */);
     lua_rawset(L, LUA_REGISTRYINDEX);
-    
-	/*registry coroutine's keys table*/
-    lua_pushlightuserdata(L, &lua_coroutines_key);
-    lua_createtable(L, 0, 32 /* nrec */);
-    lua_rawset(L, LUA_REGISTRYINDEX);
 
     return;
 }
@@ -110,7 +119,7 @@ void Lua::init_response(){
     return;
 }
 
-int Lua::lua_cache_load_code(std::string *cache_key){
+int Lua::lua_cache_load_code(){
 	int          rc;
     u_char      *err;
 
@@ -122,7 +131,7 @@ int Lua::lua_cache_load_code(std::string *cache_key){
         return LUA_SSDB_ERR;
     }
 
-    lua_getfield(L, -1, cache_key->c_str());    /*  sp++ */
+    lua_getfield(L, -1, cache_key.c_str());    /*  sp++ */
 
     if (lua_isfunction(L, -1)) {
         /*  call closure factory to gen new closure */
@@ -151,7 +160,7 @@ int Lua::lua_cache_load_code(std::string *cache_key){
     return LUA_SSDB_DECLINED;
 }
 
-int Lua::lua_cache_store_code(std::string *cache_key){
+int Lua::lua_cache_store_code(){
     int rc;
 
     /*  get code cache table */
@@ -163,8 +172,8 @@ int Lua::lua_cache_store_code(std::string *cache_key){
     }
 
     lua_pushvalue(L, -2); /* closure cache closure */
-    /* lua_code_cache_key[key] = code */
-    lua_setfield(L, -2, cache_key->c_str()); /* closure cache */
+    /* ngx_http_lua_code_cache_key[key] = code */
+    lua_setfield(L, -2, cache_key.c_str()); /* closure cache */
 
     /*  remove cache table, leave closure factory at top of stack */
     lua_pop(L, 1); /* closure */
@@ -178,7 +187,7 @@ int Lua::lua_cache_store_code(std::string *cache_key){
     return LUA_SSDB_OK;
 }
 
-int Lua::lua_clfactory_loadfile(std::string *filename){
+int Lua::lua_clfactory_loadfile(std::string filename){
     int                             status, readstatus;
 
     lua_clfactory_file_ctx_t        lf;
@@ -195,9 +204,9 @@ int Lua::lua_clfactory_loadfile(std::string *filename){
     lf.end_code = CLFACTORY_END_CODE; // \nend
     lf.end_code_len = CLFACTORY_END_SIZE;
 
-    lua_pushfstring(L, "@%s", filename->c_str());
+    lua_pushfstring(L, "@%s", filename.c_str());
 
-    lf.f = fopen(filename->c_str(), "r");
+    lf.f = fopen(filename.c_str(), "r");
 
 	// set the sent status
     lf.sent_begin = lf.sent_end = 0;
@@ -253,13 +262,13 @@ Lua::lua_clfactory_getF(lua_State *L, void *ud, size_t *size){
     return lf->buff;
 }
 
-int Lua::lua_cache_loadfile(std::string *filename) {
-	std::string cache_key = "cache:" + (*filename);
+int Lua::lua_cache_loadfile(std::string filepath) {
+	cache_key = "cache:" + filepath;
     const char      *err = NULL;
 
     int n = lua_gettop(L);
 
-	int rc = lua_cache_load_code(&cache_key);
+	int rc = lua_cache_load_code();
     if (rc == LUA_SSDB_OK) {
         /*  code chunk loaded from cache, sp++ */
         return LUA_SSDB_OK;
@@ -270,7 +279,7 @@ int Lua::lua_cache_loadfile(std::string *filename) {
     }
 
     /*  load closure factory of script file to the top of lua stack, sp++ */
-    rc = lua_clfactory_loadfile(filename);
+    rc = lua_clfactory_loadfile(filepath);
 
     if (rc != 0) {
         switch (rc) {
@@ -295,7 +304,7 @@ int Lua::lua_cache_loadfile(std::string *filename) {
 
     /*  store closure factory and gen new closure at the top of lua stack
      *  to code cache */
-    rc = lua_cache_store_code(&cache_key);
+    rc = lua_cache_store_code();
 
     return LUA_SSDB_OK;
 
@@ -305,8 +314,8 @@ error:
     return LUA_SSDB_ERR;
 }
 
-int Lua::lua_clear_file_cache(std::string *filename){
-	std::string cache_key = "cache:" + (*filename);
+int Lua::lua_clear_file_cache(std::string filepath){
+	cache_key = "cache:" + filepath;
     lua_pushlightuserdata(L, &lua_code_cache_key);
     lua_rawget(L, LUA_REGISTRYINDEX);    /*  sp++ */
 
@@ -320,67 +329,38 @@ int Lua::lua_clear_file_cache(std::string *filename){
     lua_pop(L, 1);
 }
 
-lua_State*
-Lua::lua_new_thread(){
-    int              base, ref;
+int Lua::lua_new_thread(){
+    int              base;
     lua_State       *co;
 
     base = lua_gettop(L);
 
-    lua_pushlightuserdata(L, &lua_coroutines_key);
+    lua_pushlightuserdata(L, &ngx_http_lua_coroutines_key);
     lua_rawget(L, LUA_REGISTRYINDEX);
 
     co = lua_newthread(L);
 
-    /* inherit the L's global table to be __index */
-    lua_pushvalue(co, LUA_GLOBALSINDEX);
-    lua_setfield(co, -1, "__index");
-    
-    /*  set closure's env table to new coroutine's globals table, to store the resp */
-    lua_createtable(co, 0, 1);
-    lua_replace(co, LUA_GLOBALSINDEX);
-    
-    /* set the global table to env */
-    lua_pushvalue(co, LUA_GLOBALSINDEX);
-    lua_setfenv(co, -1);
-    
-    /* add a reference to avoid co be collected */
-    ref = luaL_ref(L, -2);
-    if(ref == LUA_NOREF) {
-        lua_settop(L, base); /* restore main thread stack */
-        return NULL;
-    }
+    *ref = luaL_ref(L, -2);
 
-    lua_pushinteger(co, ref);
-    lua_setglobal(co, lua_ssdb_reference); //TODO: may be it is danger to put the refer in global table
-
-    lua_settop(L, base); /* restore main thread stack */
-
-    /* copy the code to co */
-    lua_xmove(L, co, 1);
-
+    lua_settop(L, base);
     return co;
 }
 
-void
-Lua::lua_del_thread(lua_State *co){
-    int              ref;
-
-    lua_getglobal(co, lua_ssdb_reference);
-    ref = (int)lua_tonumber(co, -1);
-
-    lua_pushlightuserdata(L, &lua_coroutines_key);
-    lua_rawget(L, LUA_REGISTRYINDEX);
-    luaL_unref(L, -1, ref);
-    
-    return;
+int Lua::lua_set_ssdb_resp(Response *resp){
+	ssdb_lua_set_resp(L, resp);
+    return LUA_SSDB_OK;
 }
 
-int Lua::lua_execute_by_filename(std::string *filename, Response *resp){
-	lua_cache_loadfile(filename);
+int Lua::lua_set_ssdb_serv(SSDBServer *serv){
+	ssdb_lua_set_server(L, serv);
+    return LUA_SSDB_OK;
+}
+
+int Lua::lua_execute_by_filepath(std::string filepath){
+	lua_cache_loadfile(filepath);
+    Response *resp = ssdb_lua_get_resp(L);
 
 	if (lua_isfunction(L, -1)) {
-        ssdb_lua_set_resp(L, resp);
 		int bRet = lua_pcall(L, 0, 0, 0);
 		if(bRet) 
 		{
@@ -395,22 +375,16 @@ int Lua::lua_execute_by_filename(std::string *filename, Response *resp){
     return LUA_SSDB_ERR;
 }
 
-int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
-    c_mutex.lock();
-    lua_cache_loadfile(filename);
+int Lua::lua_execute_by_thread(std::string filepath){
+    lua_cache_loadfile(filepath);
+    Response *resp = ssdb_lua_get_resp(L);
 
 	if (lua_isfunction(L, -1)) {
         lua_State *co = lua_new_thread();
-        c_mutex.unlock();
-
-        if(NULL == co) {
-			return LUA_SSDB_ERR;
-        }
-
-        /* add the response to the new gobal table */
-        ssdb_lua_set_resp(co, resp);
+        
+        //copy the code to co
+        lua_xmove(L, co, 1);
         int bRet = lua_resume(co, 0);
-
 		if(bRet) 
 		{
     		//TODO:echo the error to the log file instand of return data
@@ -418,39 +392,27 @@ int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
  			log_error("lua code error: %s", err.data());
 			lua_pop(co, 1);
 			resp->push_back("run_error");
-
-            d_mutex.lock();
-            lua_del_thread(co);
-            d_mutex.unlock();
 			return LUA_SSDB_ERR;
 		}
-
-        d_mutex.lock();
-        lua_del_thread(co);
-        d_mutex.unlock();
         return LUA_SSDB_OK;
 	}
-    
-    c_mutex.unlock();
     return LUA_SSDB_ERR;
 }
+
+int Lua::lua_thread_push(LuaJob job){
+    worker->push(job);
+    return LUA_SSDB_ERR;
+}
+
 
 //TODO:a new method in lua for read through thread
 static int proc_lua(NetworkServer *net, Link *link, const Request &req, Response *resp){
 	Lua *hlua = net->hlua;
 
-	std::string filename = req[1].String();
-	hlua->lua_execute_by_filename(&filename, resp);
+	hlua->lua_set_ssdb_resp(L, resp);
 
-	return 0;
-}
-
-static int proc_lua_thread(NetworkServer *net, Link *link, const Request &req, Response *resp){
-    //use a lua_newthread to excute the file, and use the ssdb's thread worker
-	Lua *hlua = net->hlua;
-
-	std::string filename = req[1].String();
-	hlua->lua_execute_by_thread(&filename, resp);
+	std::string filepath (req[1].data(), req[1].size());
+	hlua->lua_execute_by_filepath(filepath)
 
 	return 0;
 }
@@ -458,10 +420,25 @@ static int proc_lua_thread(NetworkServer *net, Link *link, const Request &req, R
 static int proc_lua_clear(NetworkServer *net, Link *link, const Request &req, Response *resp){
 	Lua *hlua = net->hlua;
     
-	std::string filename = req[1].String();
-	hlua->lua_clear_file_cache(&filename);
+	std::string filepath (req[1].data(), req[1].size());
+	hlua->lua_clear_file_cache(filepath);
 
 	resp->push_back("ok");
+	return 0;
+}
+
+static int proc_lua_thread(NetworkServer *net, Link *link, const Request &req, Response *resp){
+    //use a lua_newthread to excute the file, and use the ssdb's thread worker
+    
+    
+    //use the single thread
+	/*Lua *hlua = net->hlua;
+	std::string filepath (req[1].data(), req[1].size());
+    LuaJob *job = new LuaJob();
+    job->link = link;
+    job->req = link->last_recv();
+	hlua->lua_thread_push(job);*/
+
 	return 0;
 }
 

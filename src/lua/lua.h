@@ -6,9 +6,9 @@
 #include <lua.hpp>
 
 #include "../serv.h"
+#include "../util/thread.h"
 #include "../util/bytes.h"
 #include "../net/server.h"
-#include "../util/thread.h"
 
 #define DEF_LUA_PROC(f) int lua_proc_##f(lua_State *L)
 
@@ -20,36 +20,35 @@
         return luaL_error(L, "wrong number of arguments"); \
     }
 
-#define lua_ssdb_server    "_lua_ssdb_serv"
-#define lua_ssdb_response  "_lua_ssdb_resp"
-#define lua_ssdb_reference "_lua_ssdb_refer_key"
+#define lua_ssdb_server   "_lua_ssdb_serv"
+#define lua_ssdb_response "_lua_ssdb_resp"
 
 class SSDBServer;
+typedef WorkerPool<LuaWorker, LuaJob *> LuaWorkerPool;
 
 class Lua{
 	private:
-		lua_State*            L;
-        char                  lua_code_cache_key;
-        char                  lua_coroutines_key;
-		void                  init_global();
-        void                  init_proc_kv();
-        void                  init_response();
-        int                   lua_cache_load_code(std::string *cache_key);
-        int                   lua_cache_store_code(std::string *cache_key);
-        int                   lua_clfactory_loadfile(std::string *filename);
-        int                   lua_cache_loadfile(std::string *filename);
-        lua_State*            lua_new_thread();
-        void                  lua_del_thread(lua_State *co);
-        static const char*    lua_clfactory_getF(lua_State *L, void *ud, size_t *size);
-        Mutex                 c_mutex;
-        Mutex                 d_mutex;
+		lua_State* L;
+        char lua_code_cache_key;
+        std::string cache_key;
+		void init_global();
+        void init_proc_kv();
+        void init_response();
+        int lua_cache_load_code();
+        int lua_cache_store_code();
+        int lua_clfactory_loadfile(std::string filename);
+        int lua_cache_loadfile(std::string filepath);
+        static const char * lua_clfactory_getF(lua_State *L, void *ud, size_t *size);
+        LuaWorkerPool *worker;
 	public:
 		Lua(lua_State *L);
 		~Lua();
-		static                Lua* init(NetworkServer *serv);
-        int                   lua_clear_file_cache(std::string *filename);
-		int                   lua_execute_by_filename(std::string *filename, Response *resp);
-        int                   lua_execute_by_thread(std::string *filename, Response *resp);
+		static Lua* init(NetworkServer *serv);
+		static Lua* init();
+        int lua_clear_file_cache(std::string filepath);
+		int lua_set_ssdb_resp(Response *resp);
+        int lua_set_ssdb_serv(SSDBServer *serv){
+		int lua_execute_by_filepath(std::string filepath);
 };
 
 static inline SSDBServer*
@@ -57,8 +56,7 @@ ssdb_lua_get_server(lua_State *L)
 {
     SSDBServer *serv;
 
-    lua_pushliteral(L, lua_ssdb_server);
-    lua_rawget(L, LUA_REGISTRYINDEX);
+    lua_getglobal(L, lua_ssdb_server);
     serv = (SSDBServer *)lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -71,9 +69,8 @@ ssdb_lua_get_server(lua_State *L)
 static inline void
 ssdb_lua_set_server(lua_State *L, SSDBServer *serv)
 {
-    lua_pushliteral(L, lua_ssdb_server);
     lua_pushlightuserdata(L, serv);
-    lua_rawset(L, LUA_REGISTRYINDEX);
+    lua_setglobal(L, lua_ssdb_server);
 }
 
 static inline Response*
