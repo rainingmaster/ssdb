@@ -53,7 +53,8 @@ ssdb_lua_get_server(lua_State *L)
 {
     SSDBServer *serv;
 
-    lua_getglobal(L, lua_ssdb_server);
+    lua_pushliteral(L, lua_ssdb_server);
+    lua_rawget(L, LUA_REGISTRYINDEX);
     serv = (SSDBServer *)lua_touserdata(L, -1);
     lua_pop(L, 1);
 
@@ -66,8 +67,9 @@ ssdb_lua_get_server(lua_State *L)
 static inline void
 ssdb_lua_set_server(lua_State *L, SSDBServer *serv)
 {
+    lua_pushliteral(L, lua_ssdb_server);
     lua_pushlightuserdata(L, serv);
-    lua_setglobal(L, lua_ssdb_server);
+    lua_rawset(L, LUA_REGISTRYINDEX);
 }
 
 static inline Response*
