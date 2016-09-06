@@ -37,6 +37,9 @@ DEF_LUA_PROC(resp);
 Lua::Lua(lua_State *L){
 	this->L = L;
     init_global();
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK_NP);
+    pthread_mutex_init(&mutex, &attr);
 }
 
 Lua::~Lua(){
@@ -305,13 +308,13 @@ error:
 }
 
 int Lua::lua_clear_file_cache(std::string *filename){
-    mutex.lock();
+    pthread_mutex_lock(&mutex);
 	std::string cache_key = "cache:" + (*filename);
     lua_pushlightuserdata(L, &lua_code_cache_key);
     lua_rawget(L, LUA_REGISTRYINDEX);    /*  sp++ */
 
     if (!lua_istable(L, -1)) {
-        mutex.unlock();
+        pthread_mutex_unlock(&mutex);
         return LUA_SSDB_ERR;
     }
 
@@ -319,7 +322,7 @@ int Lua::lua_clear_file_cache(std::string *filename){
     lua_setfield(L, -2, cache_key.c_str());
 
     lua_pop(L, 1);
-    mutex.unlock();
+    pthread_mutex_unlock(&mutex);
 }
 
 lua_State*
@@ -371,12 +374,12 @@ Lua::lua_del_thread(lua_State *co){
     lua_getglobal(co, lua_ssdb_reference);
     ref = (int)lua_tonumber(co, -1);
 	
-	mutex.lock();
+	pthread_mutex_lock(&mutex);
     lua_pushlightuserdata(L, &lua_coroutines_key);
     lua_rawget(L, LUA_REGISTRYINDEX);
     luaL_unref(L, -1, ref);
     lua_pop(L, 1);
-    mutex.unlock();
+    pthread_mutex_unlock(&mutex);
     
     return;
 }
@@ -401,12 +404,12 @@ int Lua::lua_execute_by_filename(std::string *filename, Response *resp){
 }
 
 int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
-    CAutoLock autolock(mutex);
+    pthread_mutex_lock(&mutex);
     lua_cache_loadfile(filename);
 
 	if (lua_isfunction(L, -1)) {
         lua_State *co = lua_new_thread();
-        autolock.unlock();
+        pthread_mutex_unlock(&mutex);
 
         if(NULL == co) {
 			return LUA_SSDB_ERR;
@@ -432,7 +435,7 @@ int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
         return LUA_SSDB_OK;
 	}
     
-    autolock.unlock();
+    pthread_mutex_unlock(&mutex);
     return LUA_SSDB_ERR;
 }
 

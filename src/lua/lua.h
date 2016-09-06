@@ -42,7 +42,7 @@ class Lua{
         lua_State*            lua_new_thread();
         void                  lua_del_thread(lua_State *co);
         static const char*    lua_clfactory_getF(lua_State *L, void *ud, size_t *size);
-        Mutex                 mutex; /* for operation of main vm */
+        pthread_mutex_t       mutex; /* for operation of main vm */
 	public:
 		Lua(lua_State *L);
 		~Lua();
@@ -50,28 +50,6 @@ class Lua{
         int                   lua_clear_file_cache(std::string *filename);
 		int                   lua_execute_by_filename(std::string *filename, Response *resp);
         int                   lua_execute_by_thread(std::string *filename, Response *resp);
-};
-
-class CAutoLock {
-    public:  
-        CAutoLock(Mutex& mutexLock):m_mutexLock(mutexLock)
-        {  
-            m_mutexLock.lock();
-        };
-
-        ~CAutoLock(){  
-            m_mutexLock.unlock();
-        };
-
-        unlock() {
-            m_mutexLock.unlock();
-        };
-
-        unlock() {
-            m_mutexLock.lock();
-        };
-    private:
-        Mutex& m_mutexLock;
 };
 
 static inline SSDBServer*
