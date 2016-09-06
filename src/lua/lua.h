@@ -2,6 +2,7 @@
 #define NET_LUA_H_
 
 #include <vector>
+#include <string>
 #include <unistd.h>
 #include <lua.hpp>
 
@@ -41,8 +42,7 @@ class Lua{
         lua_State*            lua_new_thread();
         void                  lua_del_thread(lua_State *co);
         static const char*    lua_clfactory_getF(lua_State *L, void *ud, size_t *size);
-        Mutex                 c_mutex;
-        Mutex                 d_mutex;
+        Mutex                 mutex; /* for operation of main vm */
 	public:
 		Lua(lua_State *L);
 		~Lua();

@@ -1,5 +1,4 @@
 #include <errno.h>
-#include <string.h>
 
 #include "lua.h"
 #include "../util/log.h"
@@ -306,11 +305,13 @@ error:
 }
 
 int Lua::lua_clear_file_cache(std::string *filename){
+    mutex.lock();
 	std::string cache_key = "cache:" + (*filename);
     lua_pushlightuserdata(L, &lua_code_cache_key);
     lua_rawget(L, LUA_REGISTRYINDEX);    /*  sp++ */
 
     if (!lua_istable(L, -1)) {
+        mutex.unlock();
         return LUA_SSDB_ERR;
     }
 
@@ -318,6 +319,7 @@ int Lua::lua_clear_file_cache(std::string *filename){
     lua_setfield(L, -2, cache_key.c_str());
 
     lua_pop(L, 1);
+    mutex.unlock();
 }
 
 lua_State*
@@ -368,10 +370,13 @@ Lua::lua_del_thread(lua_State *co){
 
     lua_getglobal(co, lua_ssdb_reference);
     ref = (int)lua_tonumber(co, -1);
-
+	
+	mutex.lock();
     lua_pushlightuserdata(L, &lua_coroutines_key);
     lua_rawget(L, LUA_REGISTRYINDEX);
     luaL_unref(L, -1, ref);
+    lua_pop(L, 1);
+    mutex.unlock();
     
     return;
 }
@@ -396,12 +401,12 @@ int Lua::lua_execute_by_filename(std::string *filename, Response *resp){
 }
 
 int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
-    c_mutex.lock();
+    mutex.lock();
     lua_cache_loadfile(filename);
 
 	if (lua_isfunction(L, -1)) {
         lua_State *co = lua_new_thread();
-        c_mutex.unlock();
+        mutex.unlock();
 
         if(NULL == co) {
 			return LUA_SSDB_ERR;
@@ -419,34 +424,31 @@ int Lua::lua_execute_by_thread(std::string *filename, Response *resp){
 			lua_pop(co, 1);
 			resp->push_back("run_error");
 
-            d_mutex.lock();
             lua_del_thread(co);
-            d_mutex.unlock();
 			return LUA_SSDB_ERR;
 		}
 
-        d_mutex.lock();
         lua_del_thread(co);
-        d_mutex.unlock();
         return LUA_SSDB_OK;
 	}
     
-    c_mutex.unlock();
+    mutex.unlock();
     return LUA_SSDB_ERR;
 }
 
-//TODO:a new method in lua for read through thread
+/* for write and thread */
 static int proc_lua(NetworkServer *net, Link *link, const Request &req, Response *resp){
 	Lua *hlua = net->hlua;
 
 	std::string filename = req[1].String();
-	hlua->lua_execute_by_filename(&filename, resp);
+	hlua->lua_execute_by_thread(&filename, resp);
 
 	return 0;
 }
 
+/* for read and thread */
 static int proc_lua_thread(NetworkServer *net, Link *link, const Request &req, Response *resp){
-    //use a lua_newthread to excute the file, and use the ssdb's thread worker
+    /* use a lua_newthread to excute the file */
 	Lua *hlua = net->hlua;
 
 	std::string filename = req[1].String();
@@ -464,10 +466,3 @@ static int proc_lua_clear(NetworkServer *net, Link *link, const Request &req, Re
 	resp->push_back("ok");
 	return 0;
 }
-
-/*
- * TODO:new co
- */
-/*Lua* Lua::ngx_http_lua_new_thread(lua_State *L){
-    
-}*/
