@@ -1,6 +1,5 @@
 #include <errno.h>
 
-#include "lua.h"
 #include "../util/log.h"
 #include "lua_handler.h"
 
@@ -185,6 +184,8 @@ int LuaHandler::lua_clfactory_loadfile(std::string *filename)
     lf.end_code_len = CLFACTORY_END_SIZE;
 
     lua_pushfstring(L, "@%s", filename->c_str());
+    
+    mutex.lock();
 
     lf.f = fopen(filename->c_str(), "r");
 
@@ -197,6 +198,8 @@ int LuaHandler::lua_clfactory_loadfile(std::string *filename)
     readstatus = ferror(lf.f);
 
     fclose(lf.f);
+    
+    mutex.unlock();
 
     lua_remove(L, fname_index);
 

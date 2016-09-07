@@ -11,9 +11,9 @@ Lua::Lua(NetworkServer* net)
 {
     net->proc_map.set_proc("lua", "w", proc_lua);
     net->proc_map.set_proc("lua_clear", "w", proc_lua_clear);
-    net->proc_map.set_proc("lua_clear", "w", proc_lua_thread);
+    net->proc_map.set_proc("lua_thread", "b", proc_lua_thread);
 
-	lua = new LuaHandler((SSDBServer *)serv->data);
+	lua = new LuaHandler((SSDBServer *)net->data);
     serv = net;
 
     worker = new LuaWorkerPool("lua thread");
@@ -78,10 +78,10 @@ static int proc_lua_thread(NetworkServer *net, Link *link, const Request &req, R
     job->serv     = net;
     job->link     = link;
     job->resp     = resp;
-    job->filepath = &filepath;
+    job->filepath = filepath;
 
 	hlua->lua_execute_by_thread(job);
 
-	//resp->push_back("ok");
-	return 0;
+	resp->push_back("ok");
+	return PROC_BACKEND;
 }

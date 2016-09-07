@@ -13,7 +13,7 @@ found in the LICENSE file.
 class LuaHandler;
 struct LuaJob{
 	int result;
-	std::string     *filepath;
+	std::string     filepath;
 	NetworkServer   *serv;
 	Link            *link;
 	Request         *req;
@@ -22,7 +22,6 @@ struct LuaJob{
 	LuaJob()
     {
 		result    = 0;
-		filepath  = NULL;
 		serv      = NULL;
 		link      = NULL;
 		req       = NULL;
@@ -33,24 +32,23 @@ struct LuaJob{
 	}
 };
 
-/*class LuaWorker : public WorkerPool<LuaWorker, LuaJob*>::Worker{
+class LuaWorker : public WorkerPool<LuaWorker, LuaJob*>::Worker{
     private:
         LuaHandler*          lua;
     public:
         LuaWorker(const std::string &name);
         ~LuaWorker(){}
         void                 init();
-        void                 destroy();
         int                  proc(LuaJob *job);
-};*/
+};
 
-class LuaWorker : public WorkerPool<LuaWorker, LuaJob>::Worker{
+/*class LuaWorker : public WorkerPool<LuaWorker, LuaJob*>::Worker{
 public:
 	LuaWorker(const std::string &name);
 	~LuaWorker(){}
 	void init();
 	int proc(LuaJob *job);
-};
+};*/
 
 typedef WorkerPool<LuaWorker, LuaJob*> LuaWorkerPool;
 

@@ -19,6 +19,7 @@
 #define lua_ssdb_server   "_lua_ssdb_serv"
 #define lua_ssdb_response "_lua_ssdb_resp"
 
+class SSDBServer;
 class LuaHandler{
 	private:
 		lua_State*           L;
@@ -31,6 +32,7 @@ class LuaHandler{
         int                  lua_clfactory_loadfile(std::string *filename);
         int                  lua_cache_loadfile(std::string *filename);
         static const char*   lua_clfactory_getF(lua_State *L, void *ud, size_t *size);
+        Mutex                mutex;
 	public:
 		LuaHandler(SSDBServer *serv);
 		LuaHandler();

@@ -10,7 +10,6 @@ found in the LICENSE file.
 #include "net/proc.h"
 #include "net/server.h"
 
-DEF_PROC(lua);
 DEF_PROC(get);
 DEF_PROC(set);
 DEF_PROC(setx);
@@ -135,7 +134,6 @@ DEF_PROC(cluster_migrate_kv_data);
 #define REG_PROC(c, f)     net->proc_map.set_proc(#c, f, proc_##c)
 
 void SSDBServer::reg_procs(NetworkServer *net){
-	REG_PROC(lua, "rt");
 	REG_PROC(get, "rt");
 	REG_PROC(set, "wt");
 	REG_PROC(del, "wt");
