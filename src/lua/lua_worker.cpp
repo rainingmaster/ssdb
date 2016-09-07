@@ -1,27 +1,34 @@
 /*
 本方案需要在server->writer或server->reader中push进去job，供后面输出处理
 */
-#include "lua_worker.h"
 #include "../util/log.h"
 #include "../include.h"
+#include "lua_worker.h"
 
-LuaWorker::LuaWorker(const std::string &name){
+LuaWorker::LuaWorker(const std::string &name)
+{
 	this->name = name;
 }
 
-void LuaWorker::init(){
+void LuaWorker::init()
+{
 	log_debug("%s %d init", this->name.c_str(), this->id);
-    hlua = Lua::init();
+    //lua = new LuaHandler();
 }
 
-int LuaWorker::proc(LuaJob *job){
-    lua_State *L = hlua->L;
-	hlua->lua_execute_by_filepath(job->resp);
-	hlua->lua_set_ssdb_serv(job->resp);
+int LuaWorker::proc(LuaJob *job)
+{
+	/*lua->lua_set_ssdb_resp(job->resp);
+	lua->lua_set_ssdb_serv((SSDBServer *)job->serv->data);
 
-	hlua->lua_execute_by_filepath(job->filepath);
-    //need to put the return val into server's result->push
-    //like server worker->proc
+	lua->lua_execute_by_filepath(job->filepath);*/
+
+    ProcJob *pjob = new ProcJob();
+    pjob->link = job->link;
+    if(pjob->link->send(job->resp->resp) == -1){
+		pjob->result = PROC_ERROR;
+	}
+    job->serv->writer->insert(*pjob);
 
 	return 0;
 }

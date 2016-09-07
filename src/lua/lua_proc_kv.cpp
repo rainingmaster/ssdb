@@ -4,11 +4,12 @@ Use of this source code is governed by a BSD-style license that can be
 found in the LICENSE file.
 */
 /* kv */
-#include "lua.h"
+#include "lua_handler.h"
 #include "../net/proc.h"
 #include "../net/server.h"
 
-int lua_proc_get(lua_State *L){
+int lua_proc_get(lua_State *L)
+{
 	CHECK_LUA_NUM_PARAMS(1);
 	SSDBServer *serv = ssdb_lua_get_server(L);
     
@@ -20,7 +21,8 @@ int lua_proc_get(lua_State *L){
     return 1;
 }
 
-int lua_proc_hget(lua_State *L){
+int lua_proc_hget(lua_State *L)
+{
 	CHECK_LUA_NUM_PARAMS(2);
 	SSDBServer *serv = ssdb_lua_get_server(L);
     Bytes hash = lua_tostring(L, 1);
@@ -32,7 +34,8 @@ int lua_proc_hget(lua_State *L){
 	return 1;
 }
 
-int lua_proc_hgetall(lua_State *L){
+int lua_proc_hgetall(lua_State *L)
+{
 	CHECK_LUA_NUM_PARAMS(1);
 	SSDBServer *serv = ssdb_lua_get_server(L);
 
@@ -51,7 +54,8 @@ int lua_proc_hgetall(lua_State *L){
 	return 1;
 }
 
-int lua_proc_zscan(lua_State *L){
+int lua_proc_zscan(lua_State *L)
+{
 	CHECK_LUA_NUM_PARAMS(5);
 	SSDBServer *serv = ssdb_lua_get_server(L);
 
@@ -80,4 +84,3 @@ int lua_proc_zscan(lua_State *L){
 	delete it;
 	return 1;
 }
-
