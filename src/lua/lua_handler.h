@@ -7,10 +7,10 @@
 #include <lua.hpp>
 
 #include "../serv.h"
-#include "../util/thread.h"
 #include "../util/bytes.h"
 #include "../net/server.h"
 #include "lua.h"
+#include "lua_thread.h"
 
 #define CHECK_LUA_NUM_PARAMS(n) if (lua_gettop(L) < n) { \
         return luaL_error(L, "wrong number of arguments"); \

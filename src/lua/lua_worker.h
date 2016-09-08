@@ -1,8 +1,3 @@
-/*
-Copyright (c) 2012-2014 The SSDB Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
-*/
 #ifndef SSDB_LUA_WORKER_H_
 #define SSDB_LUA_WORKER_H_
 
@@ -14,17 +9,16 @@ class LuaHandler;
 struct LuaJob{
 	int result;
 	std::string     filepath;
-	NetworkServer   *serv;
-	Link            *link;
-	Request         *req;
-	Response        *resp;
+	NetworkServer  *serv;
+	Link           *link;
+	Request         req;
+	Response       *resp;
 	
 	LuaJob()
     {
 		result    = 0;
 		serv      = NULL;
 		link      = NULL;
-		req       = NULL;
 		resp      = NULL;
 	}
 	~LuaJob()
@@ -32,7 +26,7 @@ struct LuaJob{
 	}
 };
 
-class LuaWorker : public WorkerPool<LuaWorker, LuaJob*>::Worker{
+class LuaWorker : public LWorkerPool<LuaWorker, LuaJob*>::Worker{
     private:
         LuaHandler*          lua;
     public:
@@ -42,14 +36,6 @@ class LuaWorker : public WorkerPool<LuaWorker, LuaJob*>::Worker{
         int                  proc(LuaJob *job);
 };
 
-/*class LuaWorker : public WorkerPool<LuaWorker, LuaJob*>::Worker{
-public:
-	LuaWorker(const std::string &name);
-	~LuaWorker(){}
-	void init();
-	int proc(LuaJob *job);
-};*/
-
-typedef WorkerPool<LuaWorker, LuaJob*> LuaWorkerPool;
+typedef LWorkerPool<LuaWorker, LuaJob*> LuaWorkerPool;
 
 #endif

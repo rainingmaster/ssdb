@@ -78,10 +78,11 @@ static int proc_lua_thread(NetworkServer *net, Link *link, const Request &req, R
     job->serv     = net;
     job->link     = link;
     job->resp     = resp;
+    job->req      = req;
     job->filepath = filepath;
 
 	hlua->lua_execute_by_thread(job);
 
-	resp->push_back("ok");
-	return PROC_BACKEND;
+	//resp->push_back("ok");
+	return PROC_THREAD;
 }

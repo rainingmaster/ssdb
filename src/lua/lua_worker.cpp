@@ -1,6 +1,3 @@
-/*
-本方案需要在server->writer或server->reader中push进去job，供后面输出处理
-*/
 #include "../util/log.h"
 #include "../include.h"
 #include "lua_worker.h"
@@ -25,7 +22,8 @@ int LuaWorker::proc(LuaJob *job)
 
     ProcJob *pjob = new ProcJob();
     pjob->link = job->link;
-    pjob->resp = job->resp;
+    pjob->resp = *(job->resp);
+    pjob->req  = &(job->req);
 
     if(job->link->send(job->resp->resp) == -1){
 		pjob->result = PROC_ERROR;
@@ -36,6 +34,7 @@ int LuaWorker::proc(LuaJob *job)
         }
 	}
     job->serv->writer->insert(pjob);
+    delete job;
 
 	return 0;
 }

@@ -14,3 +14,17 @@ int lua_proc_resp(lua_State *L){
 	resp->push_back(ret);
     return 1;
 }
+
+int lua_proc_log(lua_State *L){
+    const char *msg;
+    int level = luaL_checkint(L, 1);
+    if (level < Logger::LEVEL_MIN || level > Logger::LEVEL_MAX) {
+        msg = lua_pushfstring(L, "bad log level: %d", level);
+        return luaL_argerror(L, 1, msg);
+    }
+
+    std::string c = luaL_checkstring(L, 2);
+    c = "%s(%d): [lua] " + c;
+    log_write(level, c.c_str(), __FILE__, __LINE__);
+    return 1;
+}

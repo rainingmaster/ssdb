@@ -7,9 +7,9 @@
 #include <lua.hpp>
 
 #include "../serv.h"
-#include "../util/thread.h"
 #include "../util/bytes.h"
 #include "../net/server.h"
+#include "lua_thread.h"
 #include "lua_worker.h"
 #include "lua_handler.h"
 
@@ -22,7 +22,7 @@
 struct LuaJob;
 class LuaHandler;
 class LuaWorker;
-typedef WorkerPool<LuaWorker, LuaJob*> LuaWorkerPool;
+typedef LWorkerPool<LuaWorker, LuaJob*> LuaWorkerPool;
 
 class Lua{
 	private:

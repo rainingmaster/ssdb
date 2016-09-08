@@ -29,6 +29,7 @@ DEF_LUA_PROC(hget);
 DEF_LUA_PROC(hgetall);
 DEF_LUA_PROC(zscan);
 DEF_LUA_PROC(resp);
+DEF_LUA_PROC(log);
 
 LuaHandler::LuaHandler(SSDBServer *serv)
 {
@@ -92,6 +93,9 @@ void LuaHandler::init_proc_kv(lua_State *l)
 void LuaHandler::init_response(lua_State *l){
     lua_pushcfunction(l, lua_proc_resp);
     lua_setfield(l, -2, "echo");
+
+    lua_pushcfunction(l, lua_proc_log);
+    lua_setfield(l, -2, "log");
     return;
 }
 
