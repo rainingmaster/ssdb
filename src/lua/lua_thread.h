@@ -10,6 +10,11 @@
 #include <queue>
 #include <vector>
 
+static void cleanup(void *mutex){
+    pthread_mutex_unlock((pthread_mutex_t *)mutex);
+    return;
+}
+
 // Thread safe queue
 template <class T>
 class LQueue{
@@ -119,6 +124,8 @@ int LQueue<T>::push(const T item){
 
 template <class T>
 int LQueue<T>::pop(T *data){
+     /* thread cleanup handler, unlock while thread be cancle */
+    pthread_cleanup_push(cleanup, (void *)&mutex);
 	if(pthread_mutex_lock(&mutex) != 0){
 		return -1;
 	}
@@ -134,6 +141,7 @@ int LQueue<T>::pop(T *data){
 	if(pthread_mutex_unlock(&mutex) != 0){
 		return -1;
 	}
+    pthread_cleanup_pop(0);
 	return 1;
 }
 
@@ -214,6 +222,7 @@ int LWorkerPool<W, JOB>::stop(){
 #endif
 	}
 	started = false;
+    tids.clear();
 	return 0;
 }
 

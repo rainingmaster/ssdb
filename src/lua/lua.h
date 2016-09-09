@@ -36,6 +36,7 @@ class Lua{
         int                  lua_clear_file_cache(std::string *filepath);
         int                  lua_execute_by_thread(LuaJob *job);
         int                  lua_set_ssdb_resp(Response *resp);
+        int                  lua_restart_thread();
 };
 
 #endif

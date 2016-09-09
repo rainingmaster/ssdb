@@ -34,7 +34,6 @@ int LuaWorker::proc(LuaJob *job)
         }
 	}
     job->serv->writer->insert(pjob);
-    delete job;
 
 	return 0;
 }
