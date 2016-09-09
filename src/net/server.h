@@ -41,8 +41,6 @@ private:
 
 	int num_readers;
 	int num_writers;
-	ProcWorkerPool *writer;
-	ProcWorkerPool *reader;
 
 	NetworkServer();
 
@@ -58,6 +56,8 @@ public:
 	std::string password;
     
     Lua *hlua;
+	ProcWorkerPool *writer;
+	ProcWorkerPool *reader;
 
 	~NetworkServer();
 	

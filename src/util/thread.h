@@ -151,6 +151,7 @@ class WorkerPool{
 		int stop();
 		
 		int push(JOB job);
+		int insert(JOB job);
 		int pop(JOB *job);
 };
 
@@ -327,6 +328,11 @@ WorkerPool<W, JOB>::~WorkerPool(){
 template<class W, class JOB>
 int WorkerPool<W, JOB>::push(JOB job){
 	return this->jobs.push(job);
+}
+
+template<class W, class JOB>
+int WorkerPool<W, JOB>::insert(JOB job){
+	return this->results.push(job);
 }
 
 template<class W, class JOB>
